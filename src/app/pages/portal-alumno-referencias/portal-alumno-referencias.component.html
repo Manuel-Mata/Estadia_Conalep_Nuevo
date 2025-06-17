@@ -1,0 +1,177 @@
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Portal del Alumno - Interactivo</title>
+</head>
+
+<body>
+    <div class="container">
+        <header class="header">
+            <div class="nav-bar">
+                <div>
+                    🏠 <span class="welcome-text">Portal de Referencias / Portal del Alumno</span>
+                </div>
+                <div class="user-info">
+                    <div class="status-indicator"></div>
+                    <span>En línea</span>
+                    <span id="currentTime"></span>
+                </div>
+            </div>
+        </header>
+
+        <main class="main-content">
+            <h1 class="portal-title">PORTAL DE REFERENCIAS</h1>
+
+            <!-- Sección de estadísticas -->
+            <!-- <div class="stats-section">
+                <div class="stat-card">
+                    <div class="stat-value" id="totalPagos">0</div>
+                    <div class="stat-label">Total Pagos</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="pagosPendientes">0</div>
+                    <div class="stat-label">Pendientes</div>
+                </div>
+                <div class="stat-card">
+                    <div class="stat-value" id="totalMonto">$0.00</div>
+                    <div class="stat-label">Total Monto</div>
+                </div>
+            </div> -->
+
+            <!-- Sección de búsqueda y filtros -->
+            <div class="search-section">
+                <div class="search-form">
+
+                    <div class="form-group">
+                        <label>Ingresa tu Matricula:</label>
+                        <input type="text" id="searchRef" placeholder="Ingrese matricula...">
+                    </div>
+
+                    <div class="form-group">
+                        <label>Elige tu concepto</label>
+                        <select id="filterStatus">
+                            <option value="">Todos</option>
+                            <option value="REINGRESO">REINGRESO</option>
+                            <option value="REINSCRIPCION">REINSCRIPCION</option>
+                            <option value="credencial">CREDENCIAL</option>
+                            <option value="asesoria">ASESORIA COMPLEMENTARIA</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group">
+                        <label>Elige el Periodo</label>
+                        <select id="selectPeriodo">
+                            <option value=""></option>
+                            <option value="ENE-JUL">ENERO - JULIO</option>
+                            <option value="AGO-DIC">AGOSTO - DICIEMBRE</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="carrera">
+                        <label>Elige tu Carrera</label>
+                        <select id="selectCarrera">
+                            <option value=""></option>
+                            <option value="ADMO">ADMINISTRACIÓN</option>
+                            <option value="AUTO">AUTOTRONICA</option>
+                            <option value="EMEC">ELECTROMECANICA</option>
+                            <option value="ENFE">ENFERMERIA</option>
+
+                        </select>
+
+                    </div>
+
+                    <div class="form-group" id="validator">
+                        <label>Elige tu Semestre</label>
+                        <select id="selectSemestre">
+                            <option value=""></option>
+                            <option value="1er">1er SEMESTRE</option>
+                            <option value="2do">2do SEMESTRE</option>
+                            <option value="3er">3er SEMESTRE</option>
+                            <option value="4to">4to SEMESTRE</option>
+                            <option value="5to">5to SEMESTRE</option>
+                            <option value="6to">6to SEMESTRE</option>
+                        </select>
+
+                    </div>
+                </div>
+                <button class="btn btn-blue" onclick="filtrarDatos()">🔍 GENERAR REFERENCIA</button>
+            </div>
+
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <p>Cargando datos...</p>
+            </div>
+
+            <!-- <table class="data-table" id="dataTable">
+                <thead>
+                    <tr>
+                        <th>MOTIVO DE PAGO</th>
+                        <th>REFERENCIAS VIGENTES</th>
+                        <th>FECHA DE VALIDACIÓN</th>
+                        <th>DÍAS VIGENTES</th>
+                        <th>COSTO TOTAL</th>
+                    </tr>
+                </thead>
+                <tbody id="tableBody">
+                </tbody>
+            </table> -->
+
+            <div class="button-section">
+                <button class="btn btn-blue" onclick="descargarPDF()" id="btnPDF">
+                    📄 DESCARGAR PDF
+                </button>
+                <button class="btn btn-blue" onclick="descargarPapeleta()" id="btnPapeleta">
+                    📋 DESCARGAR PNG
+                </button>
+                <!-- <button class="btn btn-blue" onclick="exportarExcel()">
+                    📊 EXPORTAR EXCEL
+                </button> -->
+            </div>
+
+            <!-- <div class="button-section">
+                <a class="btn btn-green" routerLink="/portalAlumnoReferencias" routerLinkActive="router-link-active">
+                    ➕ GENERAR NUEVO PAGO
+                </a>
+                <button class="btn btn-green" onclick="actualizarDatos()">
+                    🔄 ACTUALIZAR DATOS
+                </button>
+            </div> -->
+        </main>
+
+        <footer>
+            <button class="btn btn-red" onclick="cerrarSesion()">
+                🚪 REGRESAR
+            </button>
+        </footer>
+    </div>
+
+
+    <!-- <div id="modalNuevoPago" class="modal">
+        <div class="modal-content">
+            <span class="close" onclick="cerrarModal()">&times;</span>
+            <h2>Generar Nuevo Pago</h2>
+            <form id="formNuevoPago">
+                <div class="form-group">
+                    <label>Concepto:</label>
+                    <select id="concepto" required>
+                        <option value="">Seleccione concepto...</option>
+                        <option value="Colegiatura">Colegiatura</option>
+                        <option value="Inscripción">Inscripción</option>
+                        <option value="Material">Material</option>
+                        <option value="Evento">Evento</option>
+                    </select>
+                </div>
+                <div class="form-group">
+                    <label>Monto:</label>
+                    <input type="number" id="monto" step="0.01" required min="1">
+                </div>
+                <div class="form-group">
+                    <label>Días de vigencia:</label>
+                    <input type="number" id="diasVigencia" required min="1" max="365" value="30">
+                </div>
+                <br>
+                <button type="submit" class="btn btn-green">Generar Pago</button>
+                <button type="button" class="btn btn-red" onclick="cerrarModal()">Cancelar</button>
+            </form>
+        </div>
+    </div> -->
+</body>
