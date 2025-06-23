@@ -1,0 +1,119 @@
+<div class="login-container">
+  <div class="login-card">
+    <!-- Header -->
+    <div class="login-header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 12c2.21 0 4-1.79 4-4s-1.79-4-4-4-4 1.79-4 4 1.79 4 4 4zm0 2c-2.67 0-8 1.34-8 4v2h16v-2c0-2.66-5.33-4-8-4z"/>
+        </svg>
+      </div>
+      <h1>Portal del Alumno</h1>
+      <p>Accede a tu información académica</p>
+    </div>
+
+    <!-- Login Form -->
+    <form class="login-form">
+      <div class="input-group">
+        <label for="matricula">Matrícula</label>
+        <input 
+          type="text" 
+          id="matricula" 
+          name="matricula" 
+          placeholder="Ingresa tu matrícula"
+          required
+        >
+      </div>
+
+      <div class="input-group">
+        <label for="password">Contraseña</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          placeholder="Ingresa tu contraseña"
+          required
+        >
+      </div>
+
+      <div class="form-options">
+        <label class="checkbox-container">
+          <input type="checkbox" name="remember">
+          <span class="checkmark"></span>
+          Recordar sesión
+        </label>
+        <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button type="submit" class="login-button" routerLink="/portalAlumno">
+        <span>Iniciar Sesión</span>
+        <svg class="button-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+        </svg>
+      </button>
+    </form>
+
+    <!-- Additional Options -->
+    <div class="additional-options">
+      <div class="option-card">
+        <svg viewBox="0 0 24 24" fill="currentColor">
+          <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+        <span>Primera vez aquí</span>
+        <a href="#">Activar cuenta</a>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="login-footer">
+      <p>¿Necesitas ayuda? <a href="#" class="contact-link">Contacta a soporte académico</a></p>
+      <div class="back-link">
+        <a href="#" routerLink="/">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+          </svg>
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- <head>
+    <title>BIENVENIDO AL PORTAL DE ALLUMNO</title>
+</head>
+<body>
+    <div class="container-form">
+        <div class="informatio">
+            <div class="info-childs">
+                <h2>Bienvenido</h2>
+                <p>Para iniciar sesion, registrate con tu matricula y correo 
+                    Electronico</p>
+                <input type="button" value="Iniciar Sesión">
+
+            </div>
+            <div class="form-information">
+                <div class="form-information-childs">
+                    <h2>Crea una cuenta</h2>
+                    <div class="icon">
+                     <i class='bx  bxl-microsoft-teams'  ></i> 
+                    </div>
+                    <p>Utiliza tu cuenta institucional</p>
+                    <form>
+                        <label>
+                            <i class="bx bx-user"></i>
+                            <input type="" placeholder="Ingresa tu matricula">
+                        </label>
+                        <label>
+                            <i class="bx bx-envelope"></i>
+                            <input type="email" placeholder="Ingresa tu Correo Institucional">
+                        </label>
+                        <label>
+                            <i class="bx bx-lock"></i>
+                            <input type="password" placeholder="Ingresa tu contraseña">
+                        </label>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+</body> -->

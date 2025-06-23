@@ -1,0 +1,68 @@
+<div class="login-container">
+  <div class="login-card">
+    <!-- Header -->
+    <div class="login-header">
+      <div class="header-icon">
+        <svg viewBox="0 0 24 24">
+          <path d="M12 7V3H2v18h20V7H12zM6 19H4v-2h2v2zm0-4H4v-2h2v2zm0-4H4V9h2v2zm0-4H4V5h2v2zm4 12H8v-2h2v2zm0-4H8v-2h2v2zm0-4H8V9h2v2zm0-4H8V5h2v2zm10 12h-8v-2h2v-2h-2v-2h2v-2h-2V9h8v10zm-2-8h-2v2h2v-2zm0 4h-2v2h2v-2z"/>
+        </svg>
+      </div>
+      <h1>Servicios Escolares</h1>
+      <p>Accede al panel administrativo</p>
+    </div>
+
+    <!-- Login Form -->
+    <form class="login-form">
+      <div class="input-group">
+        <label for="usuario">Usuario</label>
+        <input 
+          type="text" 
+          id="usuario" 
+          name="usuario" 
+          placeholder="Ingresa tu usuario"
+          required
+        >
+      </div>
+
+      <div class="input-group">
+        <label for="password">Contraseña</label>
+        <input 
+          type="password" 
+          id="password" 
+          name="password" 
+          placeholder="Ingresa tu contraseña"
+          required
+        >
+      </div>
+
+      <div class="form-options">
+        <label class="checkbox-container">
+          <input type="checkbox" name="remember">
+          <span class="checkmark"></span>
+          Recordar sesión
+        </label>
+        <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+      </div>
+
+      <button type="submit" class="login-button">
+        <span>Iniciar Sesión</span>
+        <svg class="button-icon" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
+        </svg>
+      </button>
+    </form>
+
+    <!-- Footer -->
+    <div class="login-footer">
+      <p>¿No tienes acceso? <a href="#" class="contact-link">Contacta al administrador</a></p>
+      <div class="back-link">
+        <a href="#" routerLink="/">
+          <svg viewBox="0 0 24 24" fill="currentColor">
+            <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
+          </svg>
+          Volver al inicio
+        </a>
+      </div>
+    </div>
+  </div>
+</div>

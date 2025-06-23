@@ -1,0 +1,284 @@
+* {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen', 'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue', sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+.container {
+  max-width: 1200px;
+  width: 100%;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.header {
+  text-align: center;
+  margin-bottom: 60px;
+}
+
+.header-icon {
+  width: 64px;
+  height: 64px;
+  background: #1976d2;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+}
+
+.header-icon svg {
+  width: 32px;
+  height: 32px;
+  fill: white;
+}
+
+.header h1 {
+  font-size: 2.5rem;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  font-weight: 400;
+  letter-spacing: -0.025em;
+}
+
+.header p {
+  font-size: 1.25rem;
+  color: #666;
+  max-width: 600px;
+  margin: 0 auto;
+  line-height: 1.6;
+  font-weight: 300;
+}
+
+.selection-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(400px, 1fr));
+  gap: 32px;
+  max-width: 1000px;
+  margin: 0 auto;
+}
+
+.card {
+  background: white;
+  border-radius: 16px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+  padding: 40px;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.3s ease;
+  position: relative;
+  overflow: hidden;
+  text-decoration: none;
+  color: inherit;
+}
+
+.card::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.card:hover {
+  transform: translateY(-8px);
+  box-shadow: 0 8px 40px rgba(0, 0, 0, 0.15);
+  text-decoration: none;
+}
+
+.card-alumnos::before {
+  background: linear-gradient(135deg, #2196f3, #1976d2);
+}
+
+.card-servicios::before {
+  background: linear-gradient(135deg, #4caf50, #388e3c);
+}
+
+.card:hover::before {
+  opacity: 0.05;
+}
+
+.card-icon {
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 24px;
+  transition: all 0.3s ease;
+}
+
+.card-alumnos .card-icon {
+  background: #e3f2fd;
+}
+
+.card-servicios .card-icon {
+  background: #e8f5e8;
+}
+
+.card:hover .card-alumnos .card-icon {
+  background: #bbdefb;
+}
+
+.card:hover .card-servicios .card-icon {
+  background: #c8e6c9;
+}
+
+.card-icon svg {
+  width: 40px;
+  height: 40px;
+}
+
+.card-alumnos .card-icon svg {
+  fill: #1976d2;
+}
+
+.card-servicios .card-icon svg {
+  fill: #388e3c;
+}
+
+.card h2 {
+  font-size: 1.75rem;
+  color: #1a1a1a;
+  margin-bottom: 16px;
+  font-weight: 400;
+  letter-spacing: -0.02em;
+}
+
+.card-description {
+  color: #666;
+  margin-bottom: 24px;
+  line-height: 1.6;
+  font-size: 1rem;
+  font-weight: 300;
+}
+
+.card-features {
+  margin-bottom: 24px;
+}
+
+.feature-item {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  margin-bottom: 8px;
+  font-size: 0.875rem;
+  color: #777;
+  font-weight: 300;
+}
+
+.feature-dot {
+  width: 4px;
+  height: 4px;
+  border-radius: 50%;
+}
+
+.card-alumnos .feature-dot {
+  background: #1976d2;
+}
+
+.card-servicios .feature-dot {
+  background: #388e3c;
+}
+
+.card-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-weight: 400;
+  transition: all 0.3s ease;
+  letter-spacing: -0.01em;
+}
+
+.card-alumnos .card-button {
+  color: #1976d2;
+}
+
+.card-servicios .card-button {
+  color: #388e3c;
+}
+
+.card:hover .card-button {
+  gap: 8px;
+}
+
+.card-alumnos:hover .card-button {
+  color: #1565c0;
+}
+
+.card-servicios:hover .card-button {
+  color: #2e7d32;
+}
+
+.arrow-icon {
+  width: 16px;
+  height: 16px;
+  transition: transform 0.3s ease;
+}
+
+.card:hover .arrow-icon {
+  transform: translateX(4px);
+}
+
+.footer {
+  text-align: center;
+  margin-top: 60px;
+  color: #888;
+  font-size: 0.875rem;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .selection-grid {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+  
+  .header h1 {
+    font-size: 2rem;
+  }
+  
+  .header p {
+    font-size: 1.125rem;
+  }
+  
+  .card {
+    padding: 32px 24px;
+  }
+}
+
+@media (max-width: 480px) {
+  .container {
+    padding: 16px;
+  }
+  
+  .header {
+    margin-bottom: 40px;
+  }
+  
+  .header h1 {
+    font-size: 1.75rem;
+  }
+  
+  .header p {
+    font-size: 1rem;
+  }
+  
+  .selection-grid {
+    gap: 20px;
+  }
+  
+  .card {
+    padding: 24px 20px;
+  }
+  
+  .card h2 {
+    font-size: 1.5rem;
+  }
+}

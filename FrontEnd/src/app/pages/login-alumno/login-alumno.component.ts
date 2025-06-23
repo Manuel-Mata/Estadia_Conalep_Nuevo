@@ -1,5 +1,6 @@
 import { Component } from '@angular/core';
-import { RouterModule } from '@angular/router';
+import { Router, RouterModule } from '@angular/router';
+
 
 @Component({
   selector: 'app-login-alumno',
@@ -9,5 +10,6 @@ import { RouterModule } from '@angular/router';
   styleUrl: './login-alumno.component.css'
 })
 export class LoginAlumnoComponent {
+
 
 }
