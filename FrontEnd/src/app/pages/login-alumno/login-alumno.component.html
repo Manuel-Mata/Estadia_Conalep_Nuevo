@@ -1,3 +1,4 @@
+
 <div class="login-container">
   <div class="login-card">
     <!-- Header -->
@@ -11,42 +12,90 @@
       <p>Accede a tu información académica</p>
     </div>
 
+    <!-- Mensajes de Error/Éxito -->
+    <div *ngIf="errorMessage" class="error-message">
+      {{ errorMessage }}
+    </div>
+    <div *ngIf="successMessage" class="success-message">
+      {{ successMessage }}
+    </div>
+
     <!-- Login Form -->
-    <form class="login-form">
+    <form class="login-form" [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
+      
       <div class="input-group">
         <label for="matricula">Matrícula</label>
         <input 
           type="text" 
           id="matricula" 
-          name="matricula" 
+          formControlName="matricula"
           placeholder="Ingresa tu matrícula"
+          [class.error]="matricula?.invalid && matricula?.touched"
           required
         >
+        <div *ngIf="getFieldError('matricula')" class="field-error">
+          {{ getFieldError('matricula') }}
+        </div>
+      </div>
+
+      <div class="input-group">
+        <label for="email">Correo Electrónico</label>
+        <input 
+          type="email" 
+          id="email" 
+          formControlName="email"
+          placeholder="Ingresa tu correo institucional"
+          [class.error]="email?.invalid && email?.touched"
+          required
+        >
+        <div *ngIf="getFieldError('email')" class="field-error">
+          {{ getFieldError('email') }}
+        </div>
       </div>
 
       <div class="input-group">
         <label for="password">Contraseña</label>
-        <input 
-          type="password" 
-          id="password" 
-          name="password" 
-          placeholder="Ingresa tu contraseña"
-          required
-        >
+        <div class="password-container">
+          <input 
+            [type]="showPassword ? 'text' : 'password'" 
+            id="password" 
+            formControlName="password"
+            placeholder="Ingresa tu contraseña"
+            [class.error]="password?.invalid && password?.touched"
+            required
+          >
+          <button 
+            type="button" 
+            class="password-toggle"
+            (click)="togglePasswordVisibility()"
+          >
+            👁️
+          </button>
+        </div>
+        <div *ngIf="getFieldError('password')" class="field-error">
+          {{ getFieldError('password') }}
+        </div>
       </div>
 
       <div class="form-options">
         <label class="checkbox-container">
-          <input type="checkbox" name="remember">
+          <input type="checkbox" formControlName="remember">
           <span class="checkmark"></span>
           Recordar sesión
         </label>
-        <a href="#" class="forgot-password">¿Olvidaste tu contraseña?</a>
+        <a href="#" class="forgot-password" (click)="onForgotPassword()">¿Olvidaste tu contraseña?</a>
       </div>
 
-      <button type="submit" class="login-button" routerLink="/portalAlumno">
-        <span>Iniciar Sesión</span>
-        <svg class="button-icon" viewBox="0 0 24 24" fill="currentColor">
+      <!-- BOTÓN CORREGIDO - SIN routerLink -->
+      <button 
+        type="submit" 
+        class="login-button" 
+        [disabled]="isLoading"
+        [class.loading]="isLoading"
+      >
+        <span *ngIf="!isLoading">Iniciar Sesión</span>
+        <span *ngIf="isLoading">Iniciando sesión...</span>
+        <svg *ngIf="!isLoading" class="button-icon" viewBox="0 0 24 24" fill="currentColor">
           <path d="M8.59 16.59L13.17 12 8.59 7.41 10 6l6 6-6 6-1.41-1.41z"/>
         </svg>
       </button>
@@ -59,15 +108,15 @@
           <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
         </svg>
         <span>Primera vez aquí</span>
-        <a href="#">Activar cuenta</a>
+        <a href="#" (click)="onActivateAccount()">Activar cuenta</a>
       </div>
     </div>
 
     <!-- Footer -->
     <div class="login-footer">
-      <p>¿Necesitas ayuda? <a href="#" class="contact-link">Contacta a soporte académico</a></p>
+      <p>¿Necesitas ayuda? <a href="#" class="contact-link" (click)="onContactSupport()">Contacta a soporte académico</a></p>
       <div class="back-link">
-        <a routerLink="/">
+        <a href="#" (click)="goBack()">
           <svg viewBox="0 0 24 24" fill="currentColor">
             <path d="M15.41 16.59L10.83 12l4.58-4.59L14 6l-6 6 6 6 1.41-1.41z"/>
           </svg>
@@ -77,43 +126,3 @@
     </div>
   </div>
 </div>
-
-<!-- <head>
-    <title>BIENVENIDO AL PORTAL DE ALLUMNO</title>
-</head>
-<body>
-    <div class="container-form">
-        <div class="informatio">
-            <div class="info-childs">
-                <h2>Bienvenido</h2>
-                <p>Para iniciar sesion, registrate con tu matricula y correo 
-                    Electronico</p>
-                <input type="button" value="Iniciar Sesión">
-
-            </div>
-            <div class="form-information">
-                <div class="form-information-childs">
-                    <h2>Crea una cuenta</h2>
-                    <div class="icon">
-                     <i class='bx  bxl-microsoft-teams'  ></i> 
-                    </div>
-                    <p>Utiliza tu cuenta institucional</p>
-                    <form>
-                        <label>
-                            <i class="bx bx-user"></i>
-                            <input type="" placeholder="Ingresa tu matricula">
-                        </label>
-                        <label>
-                            <i class="bx bx-envelope"></i>
-                            <input type="email" placeholder="Ingresa tu Correo Institucional">
-                        </label>
-                        <label>
-                            <i class="bx bx-lock"></i>
-                            <input type="password" placeholder="Ingresa tu contraseña">
-                        </label>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </div>
-</body> -->
