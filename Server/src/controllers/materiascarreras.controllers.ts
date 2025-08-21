@@ -1,25 +1,28 @@
-import {Request, Response} from 'express'
-import connection from '../db/connection'
+import { Request, Response } from 'express';
+import connection from '../db/connection';
+import { RowDataPacket } from 'mysql2'; 
 
-export const obtenerMateriasFiltradas = async (req: Request, res: Response) => {
+export const obtenerMateriasFiltradas = async (req: Request, res: Response): Promise<void> => { // ✅ Agregué : Promise<void>
   try {
-    // Obtener parámetros de la consulta
+    
     const { carrera_id, periodo_id, semestre_id } = req.query;
     
-    // ✅ VALIDACIONES
+    
     if (!carrera_id || !periodo_id || !semestre_id) {
-      return res.status(400).json({
+      res.status(400).json({ // ✅ Quité return
         success: false,
         msg: 'Se requieren carrera_id, periodo_id y semestre_id'
       });
+      return; // ✅ Solo return
     }
 
     // Validar que sean números válidos
     if (isNaN(Number(carrera_id)) || isNaN(Number(periodo_id)) || isNaN(Number(semestre_id))) {
-      return res.status(400).json({
+      res.status(400).json({ // ✅ Quité return
         success: false,
         msg: 'Los parámetros deben ser números válidos'
       });
+      return; // ✅ Solo return
     }
 
     console.log('🔍 Filtrando materias con:', { carrera_id, periodo_id, semestre_id });
@@ -45,8 +48,8 @@ export const obtenerMateriasFiltradas = async (req: Request, res: Response) => {
     `;
 
     // 🚀 EJECUTAR CONSULTA
-    const results = await new Promise((resolve, reject) => {
-      connection.query(query, [carrera_id, periodo_id, semestre_id], (error, results) => {
+    const results = await new Promise<RowDataPacket[]>((resolve, reject) => { // ✅ Agregué tipo
+      connection.query(query, [carrera_id, periodo_id, semestre_id], (error, results: RowDataPacket[]) => { // ✅ Agregué tipo
         if (error) {
           console.error('❌ Error en la consulta SQL:', error);
           reject(error);
@@ -56,7 +59,7 @@ export const obtenerMateriasFiltradas = async (req: Request, res: Response) => {
       });
     });
 
-    console.log(`✅ Se encontraron ${Array.isArray(results) ? results.length : 0} materias`);
+    console.log(`✅ Se encontraron ${results.length} materias`); // ✅ Ahora funciona directo
 
     // 📤 RESPUESTA EXITOSA
     res.status(200).json({
@@ -81,15 +84,16 @@ export const obtenerMateriasFiltradas = async (req: Request, res: Response) => {
 };
 
 // 📊 OBTENER TODAS LAS MATERIAS DE UNA CARRERA (TODOS LOS SEMESTRES)
-export const obtenerMateriasPorCarrera = async (req: Request, res: Response) => {
+export const obtenerMateriasPorCarrera = async (req: Request, res: Response): Promise<void> => { // ✅ Agregué : Promise<void>
   try {
     const { carrera_id, periodo_id } = req.query;
     
     if (!carrera_id || !periodo_id) {
-      return res.status(400).json({
+      res.status(400).json({ // ✅ Quité return
         success: false,
         msg: 'Se requieren carrera_id y periodo_id'
       });
+      return; // ✅ Solo return
     }
 
     const query = `
@@ -109,8 +113,8 @@ export const obtenerMateriasPorCarrera = async (req: Request, res: Response) => 
       ORDER BY m.semestre_id ASC, m.nombre ASC
     `;
 
-    const results = await new Promise((resolve, reject) => {
-      connection.query(query, [carrera_id, periodo_id], (error, results) => {
+    const results = await new Promise<RowDataPacket[]>((resolve, reject) => { // ✅ Agregué tipo
+      connection.query(query, [carrera_id, periodo_id], (error, results: RowDataPacket[]) => { // ✅ Agregué tipo
         if (error) reject(error);
         else resolve(results);
       });
@@ -132,15 +136,16 @@ export const obtenerMateriasPorCarrera = async (req: Request, res: Response) => 
 };
 
 // 🌟 OBTENER MATERIAS DE TRONCO COMÚN POR SEMESTRE
-export const obtenerMateriasTroncoComun = async (req: Request, res: Response) => {
+export const obtenerMateriasTroncoComun = async (req: Request, res: Response): Promise<void> => { // ✅ Agregué : Promise<void>
   try {
     const { periodo_id, semestre_id } = req.query;
     
     if (!periodo_id || !semestre_id) {
-      return res.status(400).json({
+      res.status(400).json({ // ✅ Quité return
         success: false,
         msg: 'Se requieren periodo_id y semestre_id'
       });
+      return; // ✅ Solo return
     }
 
     // Materias que están en TODAS las carreras (tronco común)
@@ -163,8 +168,8 @@ export const obtenerMateriasTroncoComun = async (req: Request, res: Response) =>
       ORDER BY m.nombre ASC
     `;
 
-    const results = await new Promise((resolve, reject) => {
-      connection.query(query, [periodo_id, semestre_id], (error, results) => {
+    const results = await new Promise<RowDataPacket[]>((resolve, reject) => { // ✅ Agregué tipo
+      connection.query(query, [periodo_id, semestre_id], (error, results: RowDataPacket[]) => { // ✅ Agregué tipo
         if (error) reject(error);
         else resolve(results);
       });
@@ -186,15 +191,16 @@ export const obtenerMateriasTroncoComun = async (req: Request, res: Response) =>
 };
 
 // 📋 OBTENER ESTADÍSTICAS DE MATERIAS POR CARRERA
-export const obtenerEstadisticasMaterias = async (req: Request, res: Response) => {
+export const obtenerEstadisticasMaterias = async (req: Request, res: Response): Promise<void> => { // ✅ Agregué : Promise<void>
   try {
     const { periodo_id } = req.query;
     
     if (!periodo_id) {
-      return res.status(400).json({
+      res.status(400).json({ // ✅ Quité return
         success: false,
         msg: 'Se requiere periodo_id'
       });
+      return; // ✅ Solo return
     }
 
     const query = `
@@ -213,8 +219,8 @@ export const obtenerEstadisticasMaterias = async (req: Request, res: Response) =
       ORDER BY c.nombre ASC, s.numero ASC
     `;
 
-    const results = await new Promise((resolve, reject) => {
-      connection.query(query, [periodo_id], (error, results) => {
+    const results = await new Promise<RowDataPacket[]>((resolve, reject) => { // ✅ Agregué tipo
+      connection.query(query, [periodo_id], (error, results: RowDataPacket[]) => { // ✅ Agregué tipo
         if (error) reject(error);
         else resolve(results);
       });

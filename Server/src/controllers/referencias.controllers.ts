@@ -290,133 +290,111 @@ export const getReferencias = async (req: Request, res: Response): Promise<void>
     }
 };
 
-export const getReferencia = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { id } = req.params;
-        
-        if (!id || isNaN(parseInt(id))) {
-            res.status(400).json({
+export const getReferencia = (req: Request, res: Response) => {
+    const { id } = req.params;
+    
+    // Query corregida (era 'referencia' debería ser 'referencias')
+    const query = `
+        SELECT 
+            r.*,
+            a.matricula,
+            a.correo_institucional,
+            c.nombre as concepto_nombre,
+            c.importe as concepto_importe
+        FROM referencias r
+        INNER JOIN alumnos a ON r.alumno_id = a.id
+        INNER JOIN conceptos c ON r.concepto_id = c.id
+        WHERE r.id = ?
+    `;
+    
+    connection.query(query, [id], (err, results: any) => {
+        if (err) {
+            console.error('Error al obtener la referencia:', err);
+            return res.status(500).json({
                 success: false,
-                msg: 'ID de referencia inválido'
+                msg: 'Error en la base de datos',
+                error: err.message
             });
-            return;
         }
         
-        const query = `
-            SELECT 
-                r.*,
-                a.matricula,
-                a.correo_institucional,
-                c.nombre as concepto_nombre,
-                c.importe as concepto_importe
-            FROM referencias r
-            INNER JOIN alumnos a ON r.alumno_id = a.id
-            INNER JOIN conceptos c ON r.concepto_id = c.id
-            WHERE r.id = ?
-        `;
-        
-        const results = await queryAsync(query, [id]) as ReferenciaData[];
-        
         if (results.length === 0) {
-            res.status(404).json({
+            return res.status(404).json({
                 success: false,
                 msg: 'Referencia no encontrada',
                 id: id
             });
-            return;
         }
         
         res.json({
             success: true,
             data: results[0]
         });
-        
-    } catch (err) {
-        console.error('Error al obtener la referencia:', err);
-        res.status(500).json({
-            success: false,
-            msg: 'Error en la base de datos',
-            error: err instanceof Error ? err.message : 'Error desconocido'
-        });
-    }
+    });
 };
 
 // ===== NUEVOS MÉTODOS NECESARIOS =====
 
 // Obtener alumno por matrícula
-export const getAlumnoPorMatricula = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const { matricula } = req.params;
-        
-        if (!matricula?.trim()) {
-            res.status(400).json({
+export const getAlumnoPorMatricula = (req: Request, res: Response) => {
+    const { matricula } = req.params;
+    
+    const query = `
+        SELECT 
+            a.id,
+            a.matricula,
+            a.correo_institucional,
+            a.carrera_id,
+            a.semestre_id,
+            c.nombre as carrera_nombre,
+            c.siglas as carrera_siglas,
+            s.numero as semestre_numero
+        FROM alumnos a
+        LEFT JOIN carreras c ON a.carrera_id = c.id
+        LEFT JOIN semestres s ON a.semestre_id = s.id
+        WHERE a.matricula = ?
+    `;
+    
+    connection.query(query, [matricula], (err, results: any) => {
+        if (err) {
+            console.error('Error al buscar alumno:', err);
+            return res.status(500).json({
                 success: false,
-                msg: 'Matrícula es requerida'
+                msg: 'Error en la base de datos'
             });
-            return;
         }
         
-        const query = `
-            SELECT 
-                a.id,
-                a.matricula,
-                a.correo_institucional,
-                a.carrera_id,
-                a.semestre_id,
-                c.nombre as carrera_nombre,
-                c.siglas as carrera_siglas,
-                s.numero as semestre_numero
-            FROM alumnos a
-            LEFT JOIN carreras c ON a.carrera_id = c.id
-            LEFT JOIN semestres s ON a.semestre_id = s.id
-            WHERE a.matricula = ?
-        `;
-        
-        const results = await queryAsync(query, [matricula.trim()]) as AlumnoData[];
-        
         if (results.length === 0) {
-            res.status(404).json({
+            return res.status(404).json({
                 success: false,
                 msg: 'Alumno no encontrado'
             });
-            return;
         }
         
         res.json({
             success: true,
             alumno: results[0]
         });
-        
-    } catch (err) {
-        console.error('Error al buscar alumno:', err);
-        res.status(500).json({
-            success: false,
-            msg: 'Error en la base de datos',
-            error: err instanceof Error ? err.message : 'Error desconocido'
-        });
-    }
+    });
 };
 
 // Obtener todos los conceptos
-export const getConceptos = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const query = 'SELECT id, nombre, importe, codigo_plantel FROM conceptos WHERE nombre IS NOT NULL ORDER BY nombre ASC';
-        
-        const results = await queryAsync(query);
+export const getConceptos = (req: Request, res: Response) => {
+    const query = 'SELECT id, nombre, importe, codigo_plantel FROM conceptos WHERE nombre IS NOT NULL ORDER BY nombre ASC';
+    
+    connection.query(query, (err, results) => {
+        if (err) {
+            console.error('Error al obtener conceptos:', err);
+            return res.status(500).json({
+                success: false,
+                msg: 'Error en la base de datos'
+            });
+        }
         
         res.json({
             success: true,
-            conceptos: results || []
+            conceptos: results
         });
-        
-    } catch (err) {
-        console.error('Error al obtener conceptos:', err);
-        res.status(500).json({
-            success: false,
-            msg: 'Error en la base de datos',
-            error: err instanceof Error ? err.message : 'Error desconocido'
-        });
-    }
+    });
 };
 
 // Obtener carreras
@@ -480,14 +458,15 @@ export const getSemestres = (req: Request, res: Response) => {
 };
 
 // Obtener materias filtradas
-export const getMateriasFiltradas = (req: Request, res: Response) => {
+export const getMateriasFiltradas = (req: Request, res: Response): void => { // ✅ Agregué : void
     const { carrera_id, periodo_id, semestre_id } = req.query;
     
     if (!carrera_id || !periodo_id || !semestre_id) {
-        return res.status(400).json({
+        res.status(400).json({ // ✅ Quité return
             success: false,
             msg: 'Se requieren carrera_id, periodo_id y semestre_id'
         });
+        return; // ✅ Solo return
     }
     
     const query = `
@@ -509,13 +488,14 @@ export const getMateriasFiltradas = (req: Request, res: Response) => {
         ORDER BY m.nombre ASC
     `;
     
-    connection.query(query, [periodo_id, carrera_id, semestre_id], (err, results) => {
+    connection.query(query, [periodo_id, carrera_id, semestre_id], (err, results: RowDataPacket[]) => { // ✅ Agregué tipo
         if (err) {
             console.error('Error al filtrar materias:', err);
-            return res.status(500).json({
+            res.status(500).json({ // ✅ Quité return
                 success: false,
                 msg: 'Error en la base de datos'
             });
+            return; // ✅ Solo return
         }
         
         res.json({
@@ -526,160 +506,170 @@ export const getMateriasFiltradas = (req: Request, res: Response) => {
 };
 
 // ===== GENERAR REFERENCIA CON ALGORITMO VBA =====
-export const generarReferencia = async (req: Request, res: Response): Promise<void> => {
-    try {
-        const {
-            matricula,
-            concepto,
-            periodo_id,
-            semestre_id,
-            carrera_id,
-            materia_id,
-            importe,
-            fechaVencimiento,
-            usuario_creador,
-            observaciones
-        } = req.body;
-        
-        // Validaciones básicas
-        if (!matricula || !concepto) {
-            res.status(400).json({
+export const generarReferencia = (req: Request, res: Response): void => { // ✅ Agregué : void
+    const {
+        matricula,
+        concepto,
+        periodo_id,
+        semestre_id,
+        carrera_id,
+        materia_id,
+        importe,
+        fechaVencimiento
+    } = req.body;
+    
+    // Validaciones básicas
+    if (!matricula || !concepto) {
+        res.status(400).json({ // ✅ Quité return
+            success: false,
+            msg: 'Matrícula y concepto son requeridos'
+        });
+        return; // ✅ Solo return
+    }
+    
+    // Paso 1: Buscar alumno
+    const alumnoQuery = 'SELECT id, matricula, carrera_id, semestre_id FROM alumnos WHERE matricula = ?';
+    
+    connection.query(alumnoQuery, [matricula], (err, alumnoResults: RowDataPacket[]) => { // ✅ Cambié any por RowDataPacket[]
+        if (err) {
+            console.error('Error al buscar alumno:', err);
+            res.status(500).json({ // ✅ Quité return
                 success: false,
-                msg: 'Matrícula y concepto son requeridos'
+                msg: 'Error en la base de datos'
             });
-            return;
+            return; // ✅ Solo return
         }
         
-        // Paso 1: Buscar alumno
-        const alumnoQuery = 'SELECT id, matricula, carrera_id, semestre_id FROM alumnos WHERE matricula = ?';
-        const alumnoResults = await queryAsync(alumnoQuery, [matricula]) as AlumnoData[];
-        
         if (alumnoResults.length === 0) {
-            res.status(404).json({
+            res.status(404).json({ // ✅ Quité return
                 success: false,
                 msg: 'Alumno no encontrado'
             });
-            return;
+            return; // ✅ Solo return
         }
         
         const alumno = alumnoResults[0];
         
         // Paso 2: Buscar concepto
         const conceptoQuery = 'SELECT id, nombre, importe FROM conceptos WHERE nombre = ?';
-        const conceptoResults = await queryAsync(conceptoQuery, [concepto]) as ConceptoData[];
         
-        if (conceptoResults.length === 0) {
-            res.status(404).json({
-                success: false,
-                msg: 'Concepto no encontrado'
-            });
-            return;
-        }
-        
-        const conceptoData = conceptoResults[0];
-        
-        // Paso 3: Configurar datos para la referencia
-        let conceptoFinal = concepto;
-        let importeBase = importe || conceptoData.importe || 100.00;
-        let descripcionCompleta = concepto;
-        
-        if (MAPEO_CONCEPTOS[concepto]) {
-            conceptoFinal = MAPEO_CONCEPTOS[concepto].codigo;
-            descripcionCompleta = MAPEO_CONCEPTOS[concepto].descripcion;
-            if (!importe) {
-                importeBase = MAPEO_CONCEPTOS[concepto].importe;
+        connection.query(conceptoQuery, [concepto], (err, conceptoResults: RowDataPacket[]) => { // ✅ Cambié any por RowDataPacket[]
+            if (err) {
+                console.error('Error al buscar concepto:', err);
+                res.status(500).json({ // ✅ Quité return
+                    success: false,
+                    msg: 'Error en la base de datos'
+                });
+                return; // ✅ Solo return
             }
-        }
-        
-        // Paso 4: Calcular fecha de vencimiento
-        const fechaVenc = fechaVencimiento ? new Date(fechaVencimiento + 'T00:00:00') : new Date();
-        if (!fechaVencimiento) {
-            fechaVenc.setDate(fechaVenc.getDate() + 30); // 30 días por defecto
-        }
-        
-        // Paso 5: Generar referencia
-        const variable = materia_id ? materia_id.toString().padStart(3, '0') : '001';
-        const referenciaGenerada = generarReferenciaBancaria({
-            concepto: conceptoFinal,
-            fechaVencimiento: fechaVenc.toISOString().split('T')[0],
-            importe: importeBase,
-            variable: variable
-        });
-        
-        // Paso 6: Verificar que la referencia no exista
-        const existeQuery = 'SELECT id FROM referencias WHERE referencia_final = ?';
-        const existeResults = await queryAsync(existeQuery, [referenciaGenerada.referencia]);
-        
-        if (existeResults.length > 0) {
-            res.status(409).json({
-                success: false,
-                msg: 'Ya existe una referencia con este número. Intente nuevamente.'
-            });
-            return;
-        }
-        
-        // Paso 7: Insertar en base de datos
-        const insertQuery = `
-            INSERT INTO referencias (
-                alumno_id, concepto_id, referencia_final, 
-                importe, fecha_vencimiento, fecha_generada,
-                dias_vigentes, estado, carrera_id, periodo_id, 
-                semestre_id, materia_id, observaciones, usuario_creador,
-                referencia_inicial, digito_verificador
-            ) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        `;
-        
-        const insertValues = [
-            alumno.id,
-            conceptoData.id,
-            referenciaGenerada.referencia,
-            importeBase,
-            fechaVenc.toISOString().split('T')[0],
-            referenciaGenerada.diasVigentes,
-            referenciaGenerada.estado,
-            carrera_id || alumno.carrera_id,
-            periodo_id || null,
-            semestre_id || alumno.semestre_id,
-            materia_id || null,
-            observaciones || `Generada automáticamente para ${descripcionCompleta}`,
-            usuario_creador || 'Sistema',
-            referenciaGenerada.referenciaBase,
-            referenciaGenerada.digitoVerificador
-        ];
-        
-        const insertResult = await queryAsync(insertQuery, insertValues) as ResultSetHeader;
-        
-        // Respuesta exitosa
-        res.status(201).json({
-            success: true,
-            msg: 'Referencia generada exitosamente',
-            referencia: {
-                id: insertResult.insertId,
-                referencia: referenciaGenerada.referencia,
-                concepto: conceptoFinal,
-                descripcion: descripcionCompleta,
-                importe: importeBase,
-                fechaVencimiento: fechaVenc.toISOString().split('T')[0],
-                fechaGeneracion: referenciaGenerada.fechaGeneracion,
-                diasVigentes: referenciaGenerada.diasVigentes,
-                estado: referenciaGenerada.estado,
-                digitoVerificador: referenciaGenerada.digitoVerificador,
-                referenciaBase: referenciaGenerada.referenciaBase,
-                alumno: {
-                    id: alumno.id,
-                    matricula: alumno.matricula
+            
+            if (conceptoResults.length === 0) {
+                res.status(404).json({ // ✅ Quité return
+                    success: false,
+                    msg: 'Concepto no encontrado'
+                });
+                return; // ✅ Solo return
+            }
+            
+            const conceptoData = conceptoResults[0];
+            
+            // Paso 3: Configurar datos para la referencia
+            let conceptoFinal = concepto;
+            let importeBase = importe || conceptoData.importe || 100.00;
+            let descripcionCompleta = concepto;
+            
+            // Mapear conceptos a códigos
+            const mapeoConceptos: { [key: string]: { codigo: string, descripcion: string, importe: number } } = {
+                'REINGRESO': { codigo: 'REI', descripcion: 'Reingreso', importe: 500.00 },
+                'REINSCRIPCION': { codigo: 'RNS', descripcion: 'Reinscripción', importe: 300.00 },
+                'CREDENCIAL': { codigo: 'CRE', descripcion: 'Credencial', importe: 150.00 },
+                'ASESORIA_COMPLEMENTARIA': { codigo: 'ASE', descripcion: 'Asesoría Complementaria', importe: 250.00 }
+            };
+            
+            if (mapeoConceptos[concepto]) {
+                conceptoFinal = mapeoConceptos[concepto].codigo;
+                descripcionCompleta = mapeoConceptos[concepto].descripcion;
+                if (!importe) {
+                    importeBase = mapeoConceptos[concepto].importe;
                 }
             }
+            
+            // Paso 4: Calcular fecha de vencimiento
+            const fechaVenc = fechaVencimiento ? new Date(fechaVencimiento) : new Date();
+            if (!fechaVencimiento) {
+                fechaVenc.setDate(fechaVenc.getDate() + 30); // 30 días por defecto
+            }
+            
+            // Paso 5: Generar referencia con algoritmo VBA
+            const variable = materia_id ? materia_id.toString().padStart(3, '0') : '001';
+            const referenciaGenerada = generarReferenciaVBA({
+                concepto: conceptoFinal,
+                fechaVencimiento: fechaVenc.toISOString().split('T')[0],
+                importe: importeBase,
+                variable: variable
+            });
+            
+            // Paso 6: Calcular días vigentes
+            const hoy = new Date();
+            const diasVigentes = Math.ceil((fechaVenc.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+            
+            // Paso 7: Insertar en base de datos
+            const insertQuery = `
+                INSERT INTO referencias (
+                    alumno_id, concepto_id, referencia_final, 
+                    importe, fecha_vencimiento, fecha_generada,
+                    dias_vigentes, estado, carrera_id, periodo_id, 
+                    semestre_id, materia_id, observaciones
+                ) VALUES (?, ?, ?, ?, ?, CURDATE(), ?, 'Vigente', ?, ?, ?, ?, ?)
+            `;
+            
+            const insertValues = [
+                alumno.id,
+                conceptoData.id,
+                referenciaGenerada,
+                importeBase,
+                fechaVenc.toISOString().split('T')[0],
+                Math.max(0, diasVigentes),
+                carrera_id || alumno.carrera_id,
+                periodo_id || null,
+                semestre_id || alumno.semestre_id,
+                materia_id || null,
+                `Generada automáticamente para ${descripcionCompleta}`
+            ];
+            
+            connection.query(insertQuery, insertValues, (err, insertResult: ResultSetHeader) => { // ✅ Cambié any por ResultSetHeader
+                if (err) {
+                    console.error('Error al insertar referencia:', err);
+                    res.status(500).json({ // ✅ Quité return
+                        success: false,
+                        msg: 'Error al guardar la referencia'
+                    });
+                    return; // ✅ Solo return
+                }
+                
+                // Respuesta exitosa
+                res.json({
+                    success: true,
+                    msg: 'Referencia generada exitosamente',
+                    referencia: {
+                        id: insertResult.insertId,
+                        referencia: referenciaGenerada,
+                        concepto: conceptoFinal,
+                        descripcion: descripcionCompleta,
+                        importe: importeBase,
+                        fechaVencimiento: fechaVenc.toISOString().split('T')[0],
+                        fechaGeneracion: new Date().toISOString().split('T')[0],
+                        diasVigentes: Math.max(0, diasVigentes),
+                        estado: 'Vigente',
+                        alumno: {
+                            id: alumno.id,
+                            matricula: alumno.matricula
+                        }
+                    }
+                });
+            });
         });
-        
-    } catch (err) {
-        console.error('Error al generar referencia:', err);
-        res.status(500).json({
-            success: false,
-            msg: 'Error al generar la referencia',
-            error: err instanceof Error ? err.message : 'Error desconocido'
-        });
-    }
+    });
 };
 
 // ===== FUNCIÓN: ALGORITMO VBA =====

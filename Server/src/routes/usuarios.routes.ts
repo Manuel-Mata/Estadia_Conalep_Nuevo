@@ -1,9 +1,10 @@
+// routes/usuarios.routes.ts
 import { Router } from "express";
-import { getUsuarios,login } from '../controllers/usuarios.controllers'
+import { getUsuarios, login } from '../controllers/usuarios.controllers';
 
 const router = Router();
-router.get('/', getUsuarios)
-router.post('/login', login)
 
+router.get('/', getUsuarios);        // GET /api/usuarios/
+router.post('/login', login);        // POST /api/usuarios/login
 
 export default router;

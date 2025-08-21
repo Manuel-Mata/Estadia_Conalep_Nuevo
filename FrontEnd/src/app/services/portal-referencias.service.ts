@@ -3,8 +3,7 @@
 
 import { Injectable } from '@angular/core';
 import { HttpClient } from '@angular/common/http';
-import { Observable } from 'rxjs';
-import { map } from 'rxjs/operators';
+import { Observable, map, catchError, of } from 'rxjs'
 
 
 export interface AlumnoData {
@@ -87,37 +86,102 @@ export class PortalReferenciasService {
     return this.http.get<AlumnoData>(`${this.BASE_URL}/alumnos/matricula/${matricula}`);
   }
 
+  buscarAlumnoPorMatricula(matricula: string): Observable<AlumnoData> {
+  return this.http.get<AlumnoData>(`${this.BASE_URL}/alumnos/matricula/${matricula}`);
+}
+
   // Obtener todas las carreras
-  obtenerCarreras(): Observable<Carrera[]> {
-    return this.http.get<Carrera[]>(`${this.BASE_URL}/carreras`);
-  }
+ obtenerCarreras(): Observable<Carrera[]> {
+  return this.http.get<{msg: string, data: Carrera[]}>(`${this.BASE_URL}/carreras`).pipe(
+    map(response => {
+      console.log('📊 Respuesta carreras completa:', response);
+      
+      if (response.data && Array.isArray(response.data)) {
+        const carreras = response.data;
+        console.log('📊 Carreras procesadas:', carreras);
+        return carreras;
+      }
+      return [];
+    }),
+    catchError(error => {
+      console.error('❌ Error al obtener carreras:', error);
+      return of([]);
+    })
+  );
+}
 
 
 obtenerConceptos(): Observable<Concepto[]> {
   return this.http.get<{success: boolean, conceptos: Concepto[]}>(`${this.BASE_URL}/conceptos`).pipe(
     map(response => {
+      console.log('📊 Respuesta conceptos desde BD:', response);
+      
       if (response.success && Array.isArray(response.conceptos)) {
-        return response.conceptos.map(concepto => ({
-          ...concepto,
-          value: concepto.codigo_pago.toString(),
-          label: `${concepto.nombre} - $${concepto.importe.toFixed(2)}`
-        }));
+        return response.conceptos.map(concepto => {
+          // 🔧 CONVERTIR IMPORTE A NÚMERO SEGURO
+          const importeNumerico = typeof concepto.importe === 'number' 
+            ? concepto.importe 
+            : parseFloat(concepto.importe) || 0;
+            
+          console.log(`📊 Concepto: ${concepto.nombre}, Importe original: ${concepto.importe} (${typeof concepto.importe}), Convertido: ${importeNumerico}`);
+            
+          return {
+            ...concepto,
+            importe: importeNumerico, // ✅ Asegurar que sea número
+            value: concepto.codigo_pago.toString(),
+            label: `${concepto.nombre} - $${importeNumerico.toFixed(2)}`
+          };
+        });
       }
       return [];
     }),
+    catchError(error => {
+      console.error('❌ Error al obtener conceptos:', error);
+      return of([]); // Necesitarás importar 'of' de rxjs
+    })
   );
 }
 
 
   // Obtener todos los períodos
-  obtenerPeriodos(): Observable<Periodo[]> {
-    return this.http.get<Periodo[]>(`${this.BASE_URL}/periodos`);
-  }
+obtenerPeriodos(): Observable<Periodo[]> {
+  return this.http.get<{success: boolean, periodos: Periodo[]}>(`${this.BASE_URL}/periodos`).pipe(
+    map(response => {
+      console.log('📊 Respuesta períodos completa:', response);
+      
+      if (response.success && Array.isArray(response.periodos)) {
+        const periodos = response.periodos;
+        console.log('📊 Períodos procesados:', periodos);
+        return periodos;
+      }
+      return [];
+    }),
+    catchError(error => {
+      console.error('❌ Error al obtener períodos:', error);
+      return of([]);
+    })
+  );
+}
 
   // Obtener todos los semestres
-  obtenerSemestres(): Observable<Semestre[]> {
-    return this.http.get<Semestre[]>(`${this.BASE_URL}/semestres`);
-  }
+ obtenerSemestres(): Observable<Semestre[]> {
+  return this.http.get<{msg: string, data: Semestre[]}>(`${this.BASE_URL}/semestres`).pipe(
+    map(response => {
+      console.log('📊 Respuesta semestres completa:', response);
+      
+      if (response.data && Array.isArray(response.data)) {
+        const semestres = response.data;
+        console.log('📊 Semestres procesados:', semestres);
+        return semestres;
+      }
+      return [];
+    }),
+    catchError(error => {
+      console.error('❌ Error al obtener semestres:', error);
+      return of([]);
+    })
+  );
+}
 
   // Obtener materias filtradas por carrera, período y semestre
   obtenerMateriasFiltradas(carrera_id: number, periodo_id: number, semestre_id: number): Observable<any> {

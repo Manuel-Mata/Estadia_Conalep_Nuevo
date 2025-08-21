@@ -1,37 +1,21 @@
-import {Router} from "express"
-import {getReferencia, getReferencias, generarReferencia, getAlumnoPorMatricula, getConceptos, getCarreras, getPeriodos,getSemestres, getMateriasFiltradas, getReferenciasAlumno} from '../controllers/referencias.controllers'
+import { Router } from 'express';
+import { 
+  obtenerTodas, 
+  guardarReferencia, 
+  obtenerReferenciasPorAlumno,
+  validarReferencia,
+  generarReferencia 
+} from '../controllers/referencias.controller';
 
 const router = Router();
 
-router.get('/', getReferencias);
+// ✅ RUTAS PRINCIPALES
+router.get('/', obtenerTodas);                                    // GET /api/referencias
+router.post('/', guardarReferencia);                             // POST /api/referencias ← ESTA ES LA QUE NECESITAS
+router.get('/alumno/:alumno_id', obtenerReferenciasPorAlumno);   // GET /api/referencias/alumno/123
+router.get('/validar/:referencia', validarReferencia);           // GET /api/referencias/validar/20252716...
 
-// Obtener una referencia específica
-router.get('/:id', getReferencia);
-
-// Generar nueva referencia (ENDPOINT PRINCIPAL)
-router.post('/generar', generarReferencia);
-
-// ===== RUTAS PARA EL PORTAL (datos necesarios para los selects) =====
-
-// Obtener alumno por matrícula
-router.get('/alumnos/matricula/:matricula', getAlumnoPorMatricula);
-
-// Obtener todos los conceptos
-router.get('/datos/conceptos', getConceptos);
-
-// Obtener todas las carreras  
-router.get('/datos/carreras', getCarreras);
-
-// Obtener todos los períodos
-router.get('/datos/periodos', getPeriodos);
-
-// Obtener todos los semestres
-router.get('/datos/semestres', getSemestres);
-
-// Obtener materias filtradas (para asesorías complementarias)
-router.get('/datos/materias/filtradas', getMateriasFiltradas);
-
-// Obtener referencias de un alumno específico
-router.get('/alumno/:alumnoId', getReferenciasAlumno);
+// ✅ RUTA LEGACY (mantener compatibilidad)
+router.post('/generar', generarReferencia);                      // POST /api/referencias/generar
 
 export default router;

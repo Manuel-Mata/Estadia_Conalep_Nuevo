@@ -6,9 +6,11 @@ import { Subject, takeUntil } from 'rxjs';
 import { jsPDF } from 'jspdf';
 import html2canvas from 'html2canvas';
 
+
 // Importar servicio de autenticación
 import { AuthService } from '../../services/auth.service';
 import {PortalReferenciasService} from '../../services/portal-referencias.service';
+import { GeneradorReferenciaVbaService, ReferenciaCompleta } from '../../services/generador-referencia-vba.service';
 
 @Component({
   selector: 'app-portal-alumno',
@@ -21,6 +23,9 @@ export class PortalAlumnoComponent implements OnInit, OnDestroy {
   
   private destroy$ = new Subject<void>();
   private platformId = inject(PLATFORM_ID);
+  private readonly BANCO_NOMBRE = 'BBVA Bancomer, S.A.';
+  private readonly CONVENIO_CIE = '1248030';
+  private readonly INSTITUCION = 'CONALEP PLANTEL SAN FELIPE';
   
   // Datos del alumno
   currentUser: any = null;
@@ -33,9 +38,20 @@ export class PortalAlumnoComponent implements OnInit, OnDestroy {
   mostrarNotificacionCambio = false;
   cambiosDetectados : string[]= [];
 
+
+  referenciasCargando = false;
+  errorCargandoReferencias = false;
+  referenciasFiltradas: any[] = [];
+  ultimaActualizacion: Date = new Date();
+
+    // ✅ PROPIEDADES PARA MEJORAR LA UX:
+  sinReferencias = false;
+  mostrarMensajeBienvenida = false;
+
   constructor(
     private authService: AuthService,
     private portalService : PortalReferenciasService,
+    private generadorVBA: GeneradorReferenciaVbaService,
     private router: Router
   ) {}
 
@@ -51,7 +67,7 @@ export class PortalAlumnoComponent implements OnInit, OnDestroy {
     this.verificarDatosActualizados();
     
     // Cargar datos de pagos
-    this.loadPaymentData();
+    //this.loadPaymentData();
 
     // Inicializar reloj
     this.updateClock();
@@ -59,6 +75,11 @@ export class PortalAlumnoComponent implements OnInit, OnDestroy {
 
     // Exponer funciones al contexto global para que el HTML pueda llamarlas
     this.exposeGlobalFunctions();
+      setTimeout(() => {
+    console.log('🔄 Forzando loadPaymentData después de 2 segundos...');
+    this.loadPaymentData();
+  }, 2000);
+
   }
 
   ngOnDestroy(): void {
@@ -183,12 +204,8 @@ private compararYActualizarDatos(datosActualizados: any): void {
 
 
    private mostrarNotificacionEnHTML(): void {
-    // Esta función se puede usar si quieres mostrar una notificación más elegante
-    // en lugar del alert básico
     console.log('📢 Mostrando notificación de cambios en HTML');
     
-    // Aquí puedes agregar lógica para mostrar un toast o modal elegante
-    // Por ejemplo, cambiar una propiedad que controle un div en el template
   }
 
 
@@ -236,7 +253,7 @@ private compararYActualizarDatos(datosActualizados: any): void {
 
 
 
-
+/**
   private loadPaymentData(): void {
     // Simular datos de ejemplo - aquí conectarías con tu servicio real
     this.datosOriginales = [
@@ -262,6 +279,327 @@ private compararYActualizarDatos(datosActualizados: any): void {
     this.updateStats();
     this.renderTable();
   }
+    */
+private loadPaymentData(): void {
+  console.log('📋 === CARGANDO REFERENCIAS REALES DESDE BD ===');
+  console.log('📋 === CARGANDO REFERENCIAS REALES DESDE BD ===');
+  console.log('👤 Usuario actual en loadPaymentData:', this.currentUser);
+  
+  
+  // Verificar que hay usuario autenticado
+  if (!this.currentUser?.id) {
+    console.warn('⚠️ No hay usuario autenticado para cargar referencias');
+    this.sinReferencias = true;
+    this.mostrarMensajeBienvenida = true;
+    this.datosOriginales = [];
+    this.datosTabla = [];
+    this.updateStats();
+    this.renderTable();
+    return;
+  }
+
+  console.log('👤 Cargando referencias del alumno ID:', this.currentUser.id);
+  
+  // 🔄 Mostrar estado de carga
+  this.referenciasCargando = true;
+  this.errorCargandoReferencias = false;
+  this.sinReferencias = false;
+
+  // 🚀 LLAMAR AL BACKEND PARA OBTENER REFERENCIAS REALES
+  this.generadorVBA.obtenerReferenciasAlumno(this.currentUser.id)
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (response: any) => {
+        console.log('✅ Respuesta completa del backend:', response);
+        
+        this.procesarRespuestaReferencias(response);
+        this.referenciasCargando = false;
+        this.ultimaActualizacion = new Date();
+      },
+      error: (error: any) => {
+        console.error('❌ Error al cargar referencias:', error);
+        this.manejarErrorCargaReferencias(error);
+        this.referenciasCargando = false;
+      }
+    });
+}
+
+
+
+private procesarRespuestaReferencias(response: any): void {
+  try {
+    let referencias: any[] = [];
+
+    // 🔍 Detectar diferentes formatos de respuesta
+    if (response && response.success && Array.isArray(response.data)) {
+      referencias = response.data;
+      console.log('✅ Formato con success:', referencias.length, 'referencias');
+    } else if (Array.isArray(response)) {
+      referencias = response;
+      console.log('✅ Formato array directo:', referencias.length, 'referencias');
+    } else if (response && Array.isArray(response.referencias)) {
+      referencias = response.referencias;
+      console.log('✅ Formato con .referencias:', referencias.length, 'referencias');
+    } else {
+      console.warn('⚠️ Formato de respuesta inesperado:', response);
+      referencias = [];
+    }
+
+    // 🔄 Transformar datos para la tabla
+    if (referencias.length > 0) {
+      this.datosOriginales = this.transformarReferenciasParaTabla(referencias);
+      this.sinReferencias = false;
+      this.mostrarMensajeBienvenida = false;
+      
+      console.log('✅ Referencias transformadas:', this.datosOriginales);
+    } else {
+      // No hay referencias para este alumno
+      this.datosOriginales = [];
+      this.sinReferencias = true;
+      this.mostrarMensajeBienvenida = true;
+      
+      console.log('📋 No hay referencias para este alumno');
+    }
+
+    // 📊 Actualizar vista
+    this.datosTabla = [...this.datosOriginales];
+    this.updateStats();
+    this.renderTable();
+    this.errorCargandoReferencias = false;
+
+  } catch (error) {
+    console.error('❌ Error procesando referencias:', error);
+    this.manejarErrorCargaReferencias(error);
+  }
+}
+
+
+
+private manejarErrorCargaReferencias(error: any): void {
+  this.errorCargandoReferencias = true;
+  this.datosOriginales = [];
+  this.datosTabla = [];
+  
+  // 🔄 Mostrar mensaje de error específico
+  let mensajeError = 'Error desconocido';
+  
+  if (error.status === 404) {
+    mensajeError = 'No se encontraron referencias para este alumno';
+    this.sinReferencias = true;
+  } else if (error.status === 0) {
+    mensajeError = 'Sin conexión al servidor';
+  } else if (error.status >= 500) {
+    mensajeError = 'Error del servidor';
+  } else {
+    mensajeError = error.message || 'Error al cargar referencias';
+  }
+
+  console.error('💥 Error específico:', mensajeError);
+  
+  // 📊 Actualizar vista con error
+  this.updateStats();
+  this.renderTable();
+  
+  // 🔄 Mostrar datos de ejemplo si es necesario para desarrollo
+  if (this.isDevelopmentMode()) {
+    console.log('🔧 Modo desarrollo: Cargando datos de ejemplo');
+    this.cargarDatosFallback();
+  }
+}
+private isDevelopmentMode(): boolean {
+  return !isPlatformBrowser(this.platformId) || 
+         window.location.hostname === 'localhost' || 
+         window.location.hostname === '127.0.0.1';
+}
+
+
+private cargarDatosFallback(): void {
+  console.log('🔄 Cargando datos de ejemplo como fallback');
+  
+  this.datosOriginales = [
+    {
+      id: 'ejemplo_1',
+      motivo: '⚠️ DATOS DE EJEMPLO - Sin conexión a BD',
+      referencia: 'EJEMPLO_001',
+      fechaValidacion: new Date().toLocaleDateString('es-MX'),
+      diasVigentes: 15,
+      costoTotal: 2500.00,
+      estado: 'Vigente',
+      fechaVencimientoOriginal: new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString(),
+      referenciaCompleta: 'EJEMPLO_001'
+    },
+    {
+      id: 'ejemplo_2',
+      motivo: '⚠️ DATOS DE EJEMPLO - Material Didáctico',
+      referencia: 'EJEMPLO_002',
+      fechaValidacion: new Date().toLocaleDateString('es-MX'),
+      diasVigentes: 5,
+      costoTotal: 850.00,
+      estado: 'Por Vencer',
+      fechaVencimientoOriginal: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000).toISOString(),
+      referenciaCompleta: 'EJEMPLO_002'
+    }
+  ];
+
+  this.datosTabla = [...this.datosOriginales];
+  this.updateStats();
+  this.renderTable();
+  this.errorCargandoReferencias = false;
+  this.sinReferencias = false;
+}
+
+
+
+/**
+private transformarReferenciasParaTabla(referencias: any[]): any[] {
+  return referencias.map(ref => ({
+    motivo: ref.descripcion || ref.concepto_nombre || 'Concepto sin descripción',
+    referencia: ref.referencia_completa || ref.referencia_final,
+    fechaValidacion: this.formatearFecha(ref.fecha_vencimiento),
+    diasVigentes: this.calcularDiasVigentes(ref.fecha_vencimiento),
+    costoTotal: parseFloat(ref.importe) || 0,
+    estado: this.determinarEstado(ref)
+  }));
+}
+*/
+
+
+/**
+private determinarEstado(referencia: any): string {
+  const hoy = new Date();
+  const vencimiento = new Date(referencia.fecha_vencimiento);
+  const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (referencia.estado === 'Pagado' || referencia.pagado) {
+    return 'Pagado';
+  } else if (diasRestantes < 0) {
+    return 'Vencido';
+  } else if (diasRestantes <= 3) {
+    return 'Por Vencer';
+  } else {
+    return 'Vigente';
+  }
+}
+ */
+
+  /**
+ * 📅 Calcular días vigentes restantes
+ */
+private calcularDiasVigentes(fechaVencimiento: string): number {
+  try {
+    if (!fechaVencimiento || fechaVencimiento === null || fechaVencimiento === 'null') {
+      console.warn('⚠️ Fecha vencimiento null:', fechaVencimiento);
+      return 0;
+    }
+
+    const hoy = new Date();
+    const vencimiento = new Date(fechaVencimiento);
+    
+    // ✅ Verificar si la fecha es válida
+    if (isNaN(vencimiento.getTime()) || vencimiento.getFullYear() < 1900) {
+      console.warn('⚠️ Fecha vencimiento inválida:', fechaVencimiento);
+      return 0;
+    }
+
+    const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+    return Math.max(0, diasRestantes);
+  } catch (error) {
+    console.warn('⚠️ Error calculando días vigentes:', fechaVencimiento, error);
+    return 0;
+  }
+}
+
+
+
+
+
+  private formatearFecha(fecha: string): string {
+  try {
+    // ✅ Manejar diferentes casos de fecha
+    if (!fecha || fecha === null || fecha === 'null') {
+      console.warn('⚠️ Fecha null o undefined:', fecha);
+      return 'Sin fecha';
+    }
+
+    // ✅ Si la fecha es una fecha muy antigua (como 1899), es probable que sea NULL en BD
+    const fechaObj = new Date(fecha);
+    
+    if (fechaObj.getFullYear() < 1900) {
+      console.warn('⚠️ Fecha muy antigua detectada (probablemente NULL en BD):', fecha);
+      return 'Fecha no válida';
+    }
+
+    if (isNaN(fechaObj.getTime())) {
+      console.warn('⚠️ Fecha inválida:', fecha);
+      return 'Fecha inválida';
+    }
+
+    return fechaObj.toLocaleDateString('es-MX', {
+      year: 'numeric',
+      month: '2-digit',
+      day: '2-digit'
+    });
+  } catch (error) {
+    console.warn('⚠️ Error formateando fecha:', fecha, error);
+    return 'Error en fecha';
+  }
+}
+
+/**
+private cargarDatosFallback(): void {
+  console.log('🔄 Cargando datos de ejemplo como fallback');
+  
+  this.datosOriginales = [
+    {
+      motivo: 'Sin conexión a BD - Datos de ejemplo',
+      referencia: 'SIN_CONEXION',
+      fechaValidacion: new Date().toLocaleDateString('es-MX'),
+      diasVigentes: 0,
+      costoTotal: 0,
+      estado: 'Error'
+    }
+  ];
+
+  this.datosTabla = [...this.datosOriginales];
+  this.updateStats();
+  this.renderTable();
+}
+*/
+/**
+private determinarEstado(referencia: any): string {
+  const hoy = new Date();
+  const vencimiento = new Date(referencia.fecha_vencimiento);
+  const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+  if (referencia.estado === 'Pagado' || referencia.pagado) {
+    return 'Pagado';
+  } else if (diasRestantes < 0) {
+    return 'Vencido';
+  } else if (diasRestantes <= 3) {
+    return 'Por Vencer';
+  } else {
+    return 'Vigente';
+  }
+}
+
+
+private calcularDiasVigentes(fechaVencimiento: string): number {
+  const hoy = new Date();
+  const vencimiento = new Date(fechaVencimiento);
+  const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+  return Math.max(0, diasRestantes);
+}
+*/
+
+
+
+
+
+
+
+
+
+
 
   private updateStats(): void {
     this.pagosPendientes = this.datosTabla.filter(item => item.estado === 'Pendiente').length;
@@ -277,27 +615,130 @@ private compararYActualizarDatos(datosActualizados: any): void {
     }
   }
 
-  private renderTable(): void {
-    if (!isPlatformBrowser(this.platformId)) return;
+private renderTable(): void {
+  if (!isPlatformBrowser(this.platformId)) return;
 
-    const tableBody = document.getElementById('tableBody');
-    if (!tableBody) return;
+  const tableBody = document.getElementById('tableBody');
+  if (!tableBody) return;
+  
 
-    if (this.datosTabla.length === 0) {
-      tableBody.innerHTML = '<tr><td colspan="5" style="text-align: center;">No hay datos disponibles</td></tr>';
-      return;
-    }
-
-    tableBody.innerHTML = this.datosTabla.map(item => `
-      <tr class="${item.estado.toLowerCase()}">
-        <td>${item.motivo}</td>
-        <td>${item.referencia}</td>
-        <td>${item.fechaValidacion}</td>
-        <td>${item.diasVigentes}</td>
-        <td>$${item.costoTotal.toFixed(2)}</td>
+  // 🔄 Estado de carga
+  if (this.referenciasCargando) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 40px;">
+          <div class="loading-inline">
+            <div class="spinner"></div>
+            <p>🔄 Cargando tus referencias...</p>
+          </div>
+        </td>
       </tr>
-    `).join('');
+    `;
+    return;
   }
+
+  // ❌ Error de carga
+  if (this.errorCargandoReferencias) {
+    tableBody.innerHTML = `
+      <tr>
+        <td colspan="7" style="text-align: center; padding: 40px;">
+          <div style="color: #d32f2f;">
+            <h3>❌ Error al cargar referencias</h3>
+            <p>No se pudieron cargar tus referencias. Verifica tu conexión.</p>
+            <button onclick="location.reload()" class="btn btn-blue" style="margin-top: 10px;">
+              🔄 Reintentar
+            </button>
+          </div>
+        </td>
+      </tr>
+    `;
+    return;
+  }
+
+  // 📋 Sin referencias
+  if (this.datosTabla.length === 0) {
+    if (this.sinReferencias) {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center; padding: 40px;">
+            <div style="color: #4a90e2;">
+              <h3>📋 ¡Bienvenido!</h3>
+              <p>Aún no tienes referencias generadas.</p>
+              <p>Haz clic en <strong>"GENERAR NUEVO PAGO"</strong> para crear tu primera referencia.</p>
+            </div>
+          </td>
+        </tr>
+      `;
+    } else {
+      tableBody.innerHTML = `
+        <tr>
+          <td colspan="7" style="text-align: center;">
+            📋 No hay datos disponibles
+          </td>
+        </tr>
+      `;
+    }
+    return;
+  }
+
+  // ✅ Mostrar referencias CON CHECKBOX + BOTONES DE ACCIÓN
+  tableBody.innerHTML = this.datosTabla.map(item => `
+    <tr class="${item.estado.toLowerCase().replace(/\s+/g, '-')}">
+      <!-- ✅ CHECKBOX -->
+      <td>
+        <input type="checkbox" 
+               class="reference-checkbox" 
+               value="${item.id}" 
+               onchange="updateDownloadButton()">
+      </td>
+      <td>${item.motivo}</td>
+      <td style="font-family: monospace; font-weight: bold;">${item.referencia}</td>
+      <td>${item.fechaValidacion}</td>
+      <td>
+        <span class="dias-badge ${this.getClassesDiasVigentes(item.diasVigentes)}">
+          ${item.diasVigentes} días
+        </span>
+      </td>
+      <td style="font-weight: bold; color: #4a90e2;">
+        $${item.costoTotal.toFixed(2)}
+      </td>
+      <!-- ✅ COLUMNA DE ACCIONES -->
+      <td>
+        <div class="action-buttons">
+          <button class="btn-icon btn-copy" 
+                  onclick="copiarReferencia('${item.referencia}')" 
+                  title="Copiar referencia">
+            📋
+          </button>
+          <button class="btn-icon btn-details" 
+                  onclick="verDetalles(${item.id})" 
+                  title="Ver detalles">
+            👁️
+          </button>
+          <button class="btn-icon btn-download" 
+                  onclick="descargarComprobante(${item.id})" 
+                  title="Descargar comprobante">
+            📄
+          </button>
+          <button class="btn-icon btn-cancel" 
+                  onclick="anularReferencia(${item.id})" 
+                  ${item.estado === 'Pagado' ? 'disabled' : ''}
+                  title="Anular referencia">
+            🚫
+          </button>
+        </div>
+      </td>
+    </tr>
+  `).join('');
+}
+
+
+private getClassesDiasVigentes(dias: number): string {
+  if (dias <= 0) return 'dias-vencido';
+  if (dias <= 3) return 'dias-critico';
+  if (dias <= 7) return 'dias-alerta';
+  return 'dias-normal';
+}
 
   private updateClock(): void {
     if (!isPlatformBrowser(this.platformId)) return;
@@ -347,6 +788,22 @@ private compararYActualizarDatos(datosActualizados: any): void {
     (window as any).actualizarDatos = () =>{
       this.actualizarDatosManualmente
     }
+
+    (window as any).copiarReferencia = (referencia: string) => {
+      this.copiarReferencia(referencia);
+    };
+
+    (window as any).verDetalles = (id: number) => {
+      this.verDetalles(id);
+    };
+
+    (window as any).descargarComprobante = (id: number) => {
+      this.descargarComprobante(id);
+    };
+
+    (window as any).anularReferencia = (id: number) => {
+      this.anularReferencia(id);
+    };
   }
 
   // FUNCIÓN PRINCIPAL: CERRAR SESIÓN
@@ -375,6 +832,60 @@ private compararYActualizarDatos(datosActualizados: any): void {
       }
     }
   }
+
+
+  copiarReferencia(referencia: string): void {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(referencia).then(() => {
+      alert('📋 Referencia copiada al portapapeles');
+    });
+  } else {
+    // Fallback para navegadores sin clipboard API
+    const textArea = document.createElement('textarea');
+    textArea.value = referencia;
+    document.body.appendChild(textArea);
+    textArea.select();
+    document.execCommand('copy');
+    document.body.removeChild(textArea);
+    alert('📋 Referencia copiada al portapapeles');
+  }
+}
+
+verDetalles(id: number): void {
+  const referencia = this.datosTabla.find(item => item.id === id);
+  if (referencia) {
+    alert(`👁️ DETALLES DE LA REFERENCIA\n\n` +
+          `Motivo: ${referencia.motivo}\n` +
+          `Referencia: ${referencia.referencia}\n` +
+          `Fecha: ${referencia.fechaValidacion}\n` +
+          `Días vigentes: ${referencia.diasVigentes}\n` +
+          `Costo: $${referencia.costoTotal.toFixed(2)}\n` +
+          `Estado: ${referencia.estado}`);
+  }
+}
+
+
+descargarComprobante(id: number): void {
+  const referencia = this.datosTabla.find(item => item.id === id);
+  if (referencia) {
+    console.log('📄 Descargando comprobante para referencia:', referencia.referencia);
+    this.generarPDFReferenciaIndividual(referencia);
+  } else {
+    alert('❌ No se encontró la referencia seleccionada');
+  }
+}
+
+anularReferencia(id: number): void {
+  const referencia = this.datosTabla.find(item => item.id === id);
+  if (referencia && referencia.estado !== 'Pagado') {
+    const confirmar = confirm(`¿Estás seguro de anular la referencia ${referencia.referencia}?`);
+    if (confirmar) {
+      console.log('🚫 Anulando referencia ID:', id);
+      // Implementar anulación en backend
+      alert('🚫 Función de anulación en desarrollo');
+    }
+  }
+}
 
   // Función para filtrar datos
   filtrarDatos(): void {
@@ -445,149 +956,168 @@ private compararYActualizarDatos(datosActualizados: any): void {
 
   // Función para descargar PDF
   async descargarPDF(): Promise<void> {
-    console.log('Descargando PDF...');
-    try {
-      // Mostrar estado de carga
-      const loadingEl = document.getElementById('loading');
-      if (loadingEl) loadingEl.style.display = 'block';
+  try {
+    const user = this.currentUser;
+    const fechaActual = new Date().toLocaleDateString('es-MX');
 
-      // Ocultar botones durante la captura
-      this.hideElementsForCapture();
+    // ✅ Obtener checkboxes seleccionados
+    const seleccionados: number[] = Array.from(document.querySelectorAll<HTMLInputElement>('.reference-checkbox:checked'))
+      .map(chk => parseInt(chk.value));
 
-      // Esperar un momento para que se oculten los elementos
-      await new Promise(resolve => setTimeout(resolve, 200));
+    if (seleccionados.length === 0) {
+      alert('⚠️ Selecciona al menos una referencia');
+      return;
+    }
 
-      // Capturar la tabla y datos
-      const element = document.querySelector('.main-content') as HTMLElement;
-      
-      if (!element) {
-        throw new Error('No se encontró el contenido para generar el PDF');
-      }
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
 
-      const canvas = await html2canvas(element, {
-        scale: 2, // Mayor calidad
-        useCORS: true,
-        allowTaint: true,
-        backgroundColor: '#ffffff',
-        height: element.scrollHeight,
-        width: element.scrollWidth
+    seleccionados.forEach((id, index) => {
+      const referencia = this.datosTabla.find(r => r.id === id);
+      if (!referencia) return;
+
+      // =========================
+      // 🔵 ENCABEZADO ESTILO BANCO
+      // =========================
+      pdf.setFillColor(0, 84, 166); // Azul BBVA
+      pdf.rect(0, 0, pageWidth, 20, "F");
+
+      pdf.setTextColor(255, 255, 255);
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text("BBVA Bancomer, S.A.", 20, 12);
+
+      pdf.setTextColor(0, 0, 0);
+      pdf.setFontSize(10);
+      pdf.text("Institución Bancaria:", 20, 30);
+      pdf.text("BBVA Bancomer, S.A.", 70, 30);
+
+      pdf.text("Convenio CIE:", 20, 36);
+      pdf.text("1248030", 70, 36);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text("CONALEP PLANTEL SAN FELIPE", pageWidth / 2, 50, { align: "center" });
+
+      // =========================
+      // 🔑 REFERENCIA DE PAGO
+      // =========================
+      pdf.setFontSize(14);
+      pdf.text("REFERENCIA DE PAGO", pageWidth / 2, 65, { align: "center" });
+
+      // ✅ Referencia en línea continua (sin espacios)
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(13);
+      pdf.text(referencia.referencia, pageWidth / 2, 75, { align: "center" });
+
+      // =========================
+      // 💰 DATOS DEL PAGO
+      // =========================
+      let yPos = 95;
+      const leftCol = 30;
+      const rightCol = 120;
+
+      pdf.setDrawColor(0, 0, 0);
+      pdf.setLineWidth(0.5);
+      pdf.rect(20, yPos - 10, pageWidth - 40, 50);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text("DATOS DEL PAGO", leftCol, yPos);
+      yPos += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(11);
+      pdf.text("Concepto:", leftCol, yPos);
+      pdf.text(referencia.motivo, rightCol, yPos);
+      yPos += 6;
+
+      pdf.text("Importe:", leftCol, yPos);
+      pdf.setFont("helvetica", "bold");
+      pdf.text(`$${referencia.costoTotal.toFixed(2)} MXN`, rightCol, yPos);
+      pdf.setFont("helvetica", "normal");
+      yPos += 6;
+
+      pdf.text("Fecha límite de pago:", leftCol, yPos);
+      pdf.text(referencia.fechaValidacion, rightCol, yPos);
+      yPos += 6;
+
+      pdf.text("Días vigentes:", leftCol, yPos);
+      pdf.text(`${referencia.diasVigentes} días`, rightCol, yPos);
+      yPos += 6;
+
+      pdf.text("Estado:", leftCol, yPos);
+      pdf.text(referencia.estado, rightCol, yPos);
+
+      // =========================
+      // 📦 DATOS DEL ESTUDIANTE
+      // =========================
+      yPos = 155;
+      pdf.rect(20, yPos - 10, pageWidth - 40, 35);
+
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(12);
+      pdf.text("DATOS DEL ESTUDIANTE", leftCol, yPos);
+      yPos += 10;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.text("Nombre:", leftCol, yPos);
+      pdf.text(user?.nombre || "N/A", rightCol, yPos);
+      yPos += 6;
+
+      pdf.text("Matrícula:", leftCol, yPos);
+      pdf.text(user?.matricula || "N/A", rightCol, yPos);
+      yPos += 6;
+
+      pdf.text("Correo:", leftCol, yPos);
+      pdf.text(user?.correo || "N/A", rightCol, yPos);
+
+      // =========================
+      // 📋 INSTRUCCIONES
+      // =========================
+      yPos = 205;
+      pdf.setFont("helvetica", "bold");
+      pdf.setFontSize(10);
+      pdf.text("INSTRUCCIONES DE PAGO:", leftCol, yPos);
+      yPos += 8;
+
+      pdf.setFont("helvetica", "normal");
+      pdf.setFontSize(9);
+      pdf.text("• Presente esta referencia en cualquier sucursal BBVA", leftCol, yPos); yPos += 5;
+      pdf.text("• También puede pagar en línea en www.bbva.mx", leftCol, yPos); yPos += 5;
+      pdf.text("• La referencia es válida hasta la fecha límite indicada", leftCol, yPos); yPos += 5;
+      pdf.text("• Conserve su comprobante de pago", leftCol, yPos);
+
+      // =========================
+      // 📅 FOOTER
+      // =========================
+      const fechaGeneracion = new Date().toLocaleDateString("es-MX", {
+        year: "numeric",
+        month: "long",
+        day: "numeric"
       });
 
-      // Mostrar elementos nuevamente
-      this.showElementsAfterCapture();
+      pdf.setFontSize(8);
+      pdf.text(`Documento generado el ${fechaGeneracion}`, pageWidth / 2, pageHeight - 15, { align: "center" });
 
-      // Crear PDF
-      const imgData = canvas.toDataURL('image/png');
-      const pdf = new jsPDF('p', 'mm', 'a4');
-      
-      // Dimensiones de la página A4
-      const pageWidth = pdf.internal.pageSize.getWidth();
-      const pageHeight = pdf.internal.pageSize.getHeight();
-      
-      // Calcular dimensiones de la imagen
-      const imgWidth = pageWidth - 20; // Margen de 10mm a cada lado
-      const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-      // Información del alumno
-      const user = this.currentUser;
-      const fechaActual = new Date().toLocaleDateString('es-ES');
-
-      // Header del PDF
-      pdf.setFontSize(16);
-      pdf.setFont('helvetica', 'bold');
-      pdf.text('PORTAL DEL ALUMNO - ESTADO DE CUENTA', pageWidth / 2, 20, { align: 'center' });
-
-      // Información del alumno
-      pdf.setFontSize(12);
-      pdf.setFont('helvetica', 'normal');
-      pdf.text(`Alumno: ${user?.nombre || 'N/A'}`, 15, 35);
-      pdf.text(`Matrícula: ${user?.matricula || 'N/A'}`, 15, 45);
-      pdf.text(`Correo: ${user?.correo || 'N/A'}`, 15, 55);
-      pdf.text(`Fecha de generación: ${fechaActual}`, 15, 65);
-
-      // Estadísticas
-      pdf.text(`Pagos pendientes: ${this.pagosPendientes}`, 15, 80);
-      pdf.text(`Total monto: $${this.totalMonto.toFixed(2)}`, 100, 80);
-
-      // Línea separadora
-      pdf.line(15, 85, pageWidth - 15, 85);
-
-      // Agregar la imagen capturada
-      let yPosition = 95;
-      
-      if (imgHeight <= pageHeight - yPosition - 20) {
-        // Si cabe en una página
-        pdf.addImage(imgData, 'PNG', 10, yPosition, imgWidth, imgHeight);
-      } else {
-        // Si necesita múltiples páginas
-        let remainingHeight = imgHeight;
-        let sourceY = 0;
-        
-        while (remainingHeight > 0) {
-          const pageAvailableHeight = pageHeight - yPosition - 20;
-          const sliceHeight = Math.min(remainingHeight, pageAvailableHeight);
-          
-          // Calcular la proporción del slice
-          const sliceRatio = sliceHeight / imgHeight;
-          const sourceHeight = canvas.height * sliceRatio;
-          
-          // Crear canvas temporal para este slice
-          const tempCanvas = document.createElement('canvas');
-          tempCanvas.width = canvas.width;
-          tempCanvas.height = sourceHeight;
-          const tempCtx = tempCanvas.getContext('2d');
-          
-          if (tempCtx) {
-            tempCtx.drawImage(canvas, 0, sourceY, canvas.width, sourceHeight, 0, 0, canvas.width, sourceHeight);
-            const sliceImgData = tempCanvas.toDataURL('image/png');
-            pdf.addImage(sliceImgData, 'PNG', 10, yPosition, imgWidth, sliceHeight);
-          }
-          
-          remainingHeight -= sliceHeight;
-          sourceY += sourceHeight;
-          
-          if (remainingHeight > 0) {
-            pdf.addPage();
-            yPosition = 20;
-          }
-        }
+      // 👉 Nueva página si no es la última
+      if (index < seleccionados.length - 1) {
+        pdf.addPage();
       }
+    });
 
-      // Footer en la última página
-      const totalPages = pdf.internal.pages.length - 1;
-      for (let i = 1; i <= totalPages; i++) {
-        pdf.setPage(i);
-        pdf.setFontSize(8);
-        pdf.setFont('helvetica', 'normal');
-        pdf.text(`Página ${i} de ${totalPages}`, pageWidth - 30, pageHeight - 10);
-        pdf.text('Generado por Portal del Alumno', 15, pageHeight - 10);
-      }
+    // Guardar archivo
+    const fileName = `Referencias_${user?.matricula || "Alumno"}_${fechaActual.replace(/\//g, "-")}.pdf`;
+    pdf.save(fileName);
 
-      // Generar nombre del archivo
-      const fileName = `Estado_Cuenta_${user?.matricula || 'Alumno'}_${fechaActual.replace(/\//g, '-')}.pdf`;
-
-      // Descargar el PDF
-      pdf.save(fileName);
-
-      // Ocultar loading
-      if (loadingEl) loadingEl.style.display = 'none';
-
-      // Mostrar mensaje de éxito
-      alert('PDF descargado correctamente');
-
-    } catch (error) {
-      console.error('Error al generar PDF:', error);
-      
-      // Mostrar elementos en caso de error
-      this.showElementsAfterCapture();
-      
-      // Ocultar loading
-      const loadingEl = document.getElementById('loading');
-      if (loadingEl) loadingEl.style.display = 'none';
-      
-      alert('Error al generar el PDF. Intenta nuevamente.');
-    }
+  } catch (error) {
+    console.error("Error al generar PDF:", error);
+    alert("❌ Error al generar el PDF. Intenta nuevamente.");
   }
+}
+
+
 
   // Función alternativa más simple para descargar PDF
   async descargarPDFSimple(): Promise<void> {
@@ -730,4 +1260,289 @@ private compararYActualizarDatos(datosActualizados: any): void {
       modal.style.display = 'none';
     }
   }
+
+
+  private transformarReferenciasParaTabla(referencias: any[]): any[] {
+    console.log('🔄 Transformando referencias para tabla:', referencias);
+
+      referencias.forEach((ref, index) => {
+      console.log(`📊 Referencia ${index + 1}:`, {
+        id: ref.id,
+        descripcion: ref.descripcion,
+        fecha_vencimiento: ref.fecha_vencimiento,
+        fecha_generada: ref.fecha_generada,
+        importe: ref.importe,
+        estado: ref.estado
+      });
+    });
+    
+    return referencias.map(ref => ({
+      id: ref.id,
+      motivo: ref.descripcion || ref.concepto_nombre || 'Concepto sin descripción',
+      referencia: ref.referencia_final || ref.referencia_completa,
+      fechaValidacion: this.formatearFecha(ref.fecha_vencimiento),
+      diasVigentes: this.calcularDiasVigentes(ref.fecha_vencimiento),
+      costoTotal: parseFloat(ref.importe) || 0,
+      estado: this.determinarEstado(ref),
+      // Datos adicionales para uso interno
+      fechaVencimientoOriginal: ref.fecha_vencimiento,
+      fechaGeneracion: ref.fecha_generada,
+      codigoPago: ref.codigo_pago,
+      referenciaCompleta: ref.referencia_final || ref.referencia_completa
+    }));
+  }
+
+  private determinarEstado(referencia: any): string {
+    const hoy = new Date();
+    const vencimiento = new Date(referencia.fecha_vencimiento);
+    const diasRestantes = Math.ceil((vencimiento.getTime() - hoy.getTime()) / (1000 * 60 * 60 * 24));
+
+    // Verificar si está pagada
+    if (referencia.estado === 'Pagado' || referencia.pagado === true) {
+      return 'Pagado';
+    }
+    
+    // Verificar vencimiento
+    if (diasRestantes < 0) {
+      return 'Vencido';
+    } else if (diasRestantes <= 3) {
+      return 'Por Vencer';
+    } else if (diasRestantes <= 7) {
+      return 'Próximo a Vencer';
+    } else {
+      return 'Vigente';
+    }
+  }
+
+
+  public recargarReferencias(): void {
+    console.log('🔄 Recargando referencias manualmente...');
+    this.loadPaymentData();
+  }
+
+
+/**
+ * 📊 Obtener resumen de estados
+ */
+private obtenerResumenEstados(): { [key: string]: number } {
+  const resumen: { [key: string]: number } = {
+    'Vigente': 0,
+    'Próximo a Vencer': 0,
+    'Por Vencer': 0,
+    'Vencido': 0,
+    'Pagado': 0
+  };
+
+  
+  this.datosTabla.forEach(item => {
+    const estado = item.estado;
+    
+    // ✅ Verificación explícita de estados válidos
+    if (estado && typeof estado === 'string' && resumen.hasOwnProperty(estado)) {
+      resumen[estado]++;
+    } else {
+      // Manejar estados no reconocidos
+      console.warn('⚠️ Estado no reconocido:', estado);
+    }
+  });
+
+  return resumen;
+}
+   private calcularEstadisticasFinancieras(): any {
+    const pendientes = this.datosTabla.filter(item => 
+      item.estado !== 'Pagado' && item.estado !== 'Vencido'
+    );
+
+    const vencidos = this.datosTabla.filter(item => item.estado === 'Vencido');
+    const pagados = this.datosTabla.filter(item => item.estado === 'Pagado');
+
+    return {
+      totalPendientes: pendientes.length,
+      montoPendiente: pendientes.reduce((sum, item) => sum + item.costoTotal, 0),
+      totalVencidos: vencidos.length,
+      montoVencido: vencidos.reduce((sum, item) => sum + item.costoTotal, 0),
+      totalPagados: pagados.length,
+      montoPagado: pagados.reduce((sum, item) => sum + item.costoTotal, 0),
+      montoTotal: this.datosTabla.reduce((sum, item) => sum + item.costoTotal, 0)
+    };
+  }
+
+
+
+//Generar PDF individual de referencia (formato oficial BBVA)
+
+async generarPDFReferenciaIndividual(referencia: any): Promise<void> {
+  try {
+    console.log('📄 Generando PDF individual para referencia:', referencia.referencia);
+    
+    const pdf = new jsPDF('p', 'mm', 'a4');
+    const pageWidth = pdf.internal.pageSize.getWidth();
+    const pageHeight = pdf.internal.pageSize.getHeight();
+    
+    // 🎨 COLORES BBVA
+    const azulBBVA = [0, 77, 153]; // #004D99
+    const grisBBVA = [102, 102, 102]; // #666666
+    
+    // 🏦 HEADER BANCARIO
+    pdf.setFillColor(azulBBVA[0], azulBBVA[1], azulBBVA[2]);
+    pdf.rect(0, 0, pageWidth, 25, 'F');
+    
+    pdf.setTextColor(255, 255, 255);
+    pdf.setFontSize(18);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('BBVA', 20, 16);
+    
+    pdf.setFontSize(12);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text('Bancomer, S.A.', 50, 16);
+    
+    // 📋 INFORMACIÓN DEL CONVENIO
+    pdf.setTextColor(0, 0, 0);
+    pdf.setFontSize(14);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Institución Bancaria:', 20, 40);
+    pdf.setFont('helvetica', 'normal');
+    pdf.text(this.BANCO_NOMBRE, 20, 50);
+    
+    pdf.setFont('helvetica', 'bold');
+    pdf.text('Convenio CIE:', 20, 65);
+    pdf.setFont('helvetica', 'normal');
+    pdf.setFontSize(16);
+    pdf.text(this.CONVENIO_CIE, 55, 65);
+    
+    // 🏫 INSTITUCIÓN EDUCATIVA
+    pdf.setFontSize(16);
+    pdf.setFont('helvetica', 'bold');
+    pdf.text(this.INSTITUCION, pageWidth / 2, 80, { align: 'center' });
+    
+    // 📏 LÍNEA SEPARADORA
+    pdf.setDrawColor(azulBBVA[0], azulBBVA[1], azulBBVA[2]);
+    pdf.setLineWidth(1);
+    pdf.line(20, 90, pageWidth - 20, 90);
+    
+    // 💰 TÍTULO DE REFERENCIA
+    pdf.setFontSize(20);
+    pdf.setFont('helvetica', 'bold');
+    pdf.setTextColor(azulBBVA[0], azulBBVA[1], azulBBVA[2]);
+    pdf.text('REFERENCIA DE PAGO', pageWidth / 2, 110, { align: 'center' });
+    
+    // 🎫 REFERENCIA PRINCIPAL - MUY GRANDE Y VISIBLE
+    pdf.setFontSize(24);
+    pdf.setFont('courier', 'bold');
+    pdf.setTextColor(0,0,0);
+    
+    // Dividir la referencia en grupos para mejor legibilidad
+    // 🔢 FORMATO DE LA REFERENCIA (en bloques de 8, separados con espacio)
+const ref = referencia.referencia;
+const refFormateada = ref.match(/.{1,8}/g)?.join(' ') || ref;
+
+// 📌 Mostrar la referencia centrada
+pdf.setFont('helvetica', 'bold');
+pdf.setFontSize(16);
+pdf.text('REFERENCIA DE PAGO', pageWidth / 2, 125, { align: 'center' });
+
+pdf.setFontSize(14);
+pdf.text(refFormateada, pageWidth / 2, 135, { align: 'center' });
+
+// 📦 RECUADRO SOLO PARA DATOS DEL ESTUDIANTE
+pdf.setDrawColor(0, 0, 0);
+pdf.setLineWidth(0.5);
+pdf.rect(20, 145, pageWidth - 40, 35); // más pequeño
+
+let yPos = 155;
+const leftCol = 30;
+const rightCol = 120;
+
+pdf.setFontSize(12);
+pdf.setFont('helvetica', 'bold');
+pdf.text('DATOS DEL ESTUDIANTE', leftCol, yPos);
+yPos += 10;
+
+pdf.setFont('helvetica', 'normal');
+pdf.text(`Nombre:`, leftCol, yPos);
+pdf.text(`${this.currentUser?.nombre || 'N/A'}`, rightCol, yPos);
+yPos += 6;
+
+pdf.text(`Matrícula:`, leftCol, yPos);
+pdf.text(`${this.currentUser?.matricula || 'N/A'}`, rightCol, yPos);
+yPos += 6;
+
+pdf.text(`Correo:`, leftCol, yPos);
+pdf.text(`${this.currentUser?.correo || 'N/A'}`, rightCol, yPos);
+
+// 📦 RECUADRO PARA DATOS DEL PAGO
+yPos += 20;
+pdf.rect(20, yPos - 10, pageWidth - 40, 50);
+
+pdf.setFont('helvetica', 'bold');
+pdf.setFontSize(12);
+pdf.text('DATOS DEL PAGO', leftCol, yPos);
+yPos += 10;
+
+pdf.setFont('helvetica', 'normal');
+pdf.setFontSize(11);
+pdf.text(`Concepto:`, leftCol, yPos);
+pdf.text(`${referencia.motivo}`, rightCol, yPos);
+yPos += 6;
+
+pdf.text(`Importe:`, leftCol, yPos);
+pdf.setFont('helvetica', 'bold');
+pdf.text(`$${referencia.costoTotal.toFixed(2)} MXN`, rightCol, yPos);
+pdf.setFont('helvetica', 'normal');
+yPos += 6;
+
+pdf.text(`Fecha límite de pago:`, leftCol, yPos);
+pdf.text(`${referencia.fechaValidacion}`, rightCol, yPos);
+yPos += 6;
+
+pdf.text(`Días vigentes:`, leftCol, yPos);
+pdf.text(`${referencia.diasVigentes} días`, rightCol, yPos);
+yPos += 6;
+
+pdf.text(`Estado:`, leftCol, yPos);
+pdf.text(`${referencia.estado}`, rightCol, yPos);
+
+// 📋 INSTRUCCIONES DE PAGO
+yPos += 25;
+pdf.setFont('helvetica', 'bold');
+pdf.setFontSize(10);
+pdf.text('INSTRUCCIONES DE PAGO:', leftCol, yPos);
+yPos += 8;
+
+pdf.setFont('helvetica', 'normal');
+pdf.setFontSize(9);
+pdf.text('• Presente esta referencia en cualquier sucursal BBVA', leftCol, yPos); yPos += 5;
+pdf.text('• La referencia es válida hasta la fecha límite indicada', leftCol, yPos); yPos += 5;
+pdf.text('• Conserve su comprobante de pago', leftCol, yPos);
+
+// 📅 FOOTER
+const fechaGeneracion = new Date().toLocaleDateString('es-MX', {
+  year: 'numeric',
+  month: 'long', 
+  day: 'numeric'
+});
+pdf.setFontSize(8);
+pdf.text(`Documento generado el ${fechaGeneracion}`, pageWidth / 2, pageHeight - 20, { align: 'center' });
+
+    
+    pdf.setFontSize(8);
+    pdf.setTextColor(grisBBVA[0], grisBBVA[1], grisBBVA[2]);
+    pdf.text(`Documento generado el ${fechaGeneracion}`, pageWidth / 2, pageHeight - 15, { align: 'center' });
+    pdf.text(`${this.INSTITUCION} - Orgullo y compromiso de la gente`, pageWidth / 2, pageHeight - 10, { align: 'center' });
+    
+    // 💾 DESCARGAR PDF
+    const nombreArchivo = `Referencia_${referencia.referencia}_${this.currentUser?.matricula}.pdf`;
+    pdf.save(nombreArchivo);
+    
+    console.log('✅ PDF generado exitosamente:', nombreArchivo);
+    
+  } catch (error) {
+    console.error('❌ Error al generar PDF individual:', error);
+    alert('Error al generar el PDF de la referencia');
+  }
+}
+
+
+
+
 }

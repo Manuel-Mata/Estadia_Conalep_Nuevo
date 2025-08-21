@@ -63,7 +63,10 @@
                     <button class="btn btn-blue" onclick="filtrarDatos()">🔍 Buscar</button>
                     <button class="btn btn-green" onclick="limpiarFiltros()">🔄 Limpiar</button>
                 </div>
+
+                
             </div>
+            
 
             <div class="loading" id="loading">
                 <div class="spinner"></div>
@@ -73,11 +76,15 @@
             <table class="data-table" id="dataTable">
                 <thead>
                     <tr>
+                        <th style="width: 50px;">
+                            <input type="checkbox" id="selectAll" onclick="toggleSelectAll()">
+                        </th>
                         <th>MOTIVO DE PAGO</th>
                         <th>REFERENCIAS VIGENTES</th>
                         <th>FECHA DE VALIDACIÓN</th>
                         <th>DÍAS VIGENTES</th>
                         <th>COSTO TOTAL</th>
+                        <th>ACCIONES</th>
                     </tr>
                 </thead>
                 <tbody id="tableBody">
@@ -91,9 +98,6 @@
                 <button class="btn btn-blue" onclick="descargarPapeleta()" id="btnPapeleta">
                     📋 DESCARGAR PNG
                 </button>
-                <!-- <button class="btn btn-blue" onclick="exportarExcel()">
-                    📊 EXPORTAR EXCEL
-                </button> -->
             </div>
 
             <div class="button-section">

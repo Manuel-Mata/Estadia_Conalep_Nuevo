@@ -407,3 +407,85 @@
                 display: none;
             }
         }
+
+.data-table .vigente {
+  background-color: #d4edda;
+  color: #155724;
+}
+
+.data-table .pagado {
+  background-color: #cce5ff;
+  color: #004085;
+}
+
+.data-table .vencido {
+  background-color: #f8d7da;
+  color: #721c24;
+}
+
+.data-table .por-vencer {
+  background-color: #fff3cd;
+  color: #856404;
+}
+
+.data-table .error {
+  background-color: #f5c6cb;
+  color: #721c24;
+}
+
+/* ✅ ESTILOS PARA BOTONES DE ACCIÓN */
+.action-buttons {
+  display: flex;
+  gap: 5px;
+  justify-content: center;
+  align-items: center;
+}
+
+.btn-icon {
+  border: none;
+  background: none;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 8px;
+  border-radius: 4px;
+  transition: all 0.2s ease;
+  min-width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover {
+  background-color: #f0f0f0;
+  transform: scale(1.1);
+}
+
+.btn-icon:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  transform: none;
+}
+
+.btn-copy:hover {
+  background-color: #e3f2fd;
+}
+
+.btn-details:hover {
+  background-color: #fff3e0;
+}
+
+.btn-download:hover {
+  background-color: #e8f5e8;
+}
+
+.btn-cancel:hover:not(:disabled) {
+  background-color: #ffebee;
+}
+
+/* ✅ AJUSTAR ANCHO DE COLUMNA ACCIONES */
+.data-table th:last-child,
+.data-table td:last-child {
+  width: 160px;
+  min-width: 160px;
+}

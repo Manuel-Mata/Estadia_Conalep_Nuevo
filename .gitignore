@@ -40,3 +40,19 @@ testem.log
 # System files
 .DS_Store
 Thumbs.db
+
+# Backend specific
+Server/node_modules/
+Server/dist/
+Server/.env
+Server/.env.backup
+
+# Package locks (opcional, algunos prefieren versionarlos)
+# package-lock.json
+
+# Logs específicos
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+

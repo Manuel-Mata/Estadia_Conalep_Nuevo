@@ -4,7 +4,10 @@
   import { Subject, takeUntil } from 'rxjs';
 
   import { PortalReferenciasService, AlumnoData, Carrera, Periodo, Semestre, Materia, Concepto } from '../../services/portal-referencias.service';
-  import { ReferenceGeneratorService, ReferenciaGenerada } from '../../services/reference-generator.service';
+  //  import { ReferenceGeneratorService, ReferenciaGenerada } from '../../services/reference-generator.service';
+  //import { GeneradorReferenciaVbaService } from '../../services/generador-referencia-vba.service'; 
+  //import { DatosReferenciaVBA } from '../../services/generador-referencia-vba.service';
+import { GeneradorReferenciaVbaService, DatosReferenciaVBA, ReferenciaCompleta } from '../../services/generador-referencia-vba.service';
 
   @Component({
     selector: 'app-portal-referencias',
@@ -14,13 +17,15 @@
     styleUrls: ['./portal-alumno-referencias.component.css']
   })
   export class PortalAlumnoReferenciasComponent implements OnInit, OnDestroy {
-    
+
+    referenciaGenerada: ReferenciaCompleta | null = null;
     private destroy$ = new Subject<void>();
     private platformId = inject(PLATFORM_ID);
-
     // Formulario principal
     referenciaForm: FormGroup;
-    
+    horaActual = new Date();
+    mostrarMaterias = false;
+
     // ✅ INICIALIZAR ARRAYS VACÍOS PARA EVITAR ERROR NgFor
     alumnoData: AlumnoData | null = null;
     carreras: Carrera[] = [];
@@ -34,21 +39,18 @@
     // Estados del componente
     isLoading = false;
     //mostrarMaterias = false;
-    referenciaGenerada: ReferenciaGenerada | null = null;
+    
     tiempoActual = '';
     
-    // Conceptos de pago
-  // conceptosPago = [
-    // { value: 'REINGRESO', label: 'Reingreso' },
-      //{ value: 'REINSCRIPCION', label: 'Reinscripción' },  
-      //{ value: 'CREDENCIAL', label: 'Credencial' },
-      //{ value: 'ASESORIA_COMPLEMENTARIA', label: 'Asesoría Complementaria' }
-    //];
+
+
+    
 
     constructor(
       private fb: FormBuilder,
       private portalService: PortalReferenciasService,
-      private referenceService: ReferenceGeneratorService
+      //private referenceService: ReferenceGeneratorService,
+      private generadorVBA: GeneradorReferenciaVbaService
     ) {
       this.referenciaForm = this.fb.group({
         matricula: ['', [Validators.required, Validators.minLength(6)]],
@@ -68,12 +70,28 @@
       //this.cargarConceptos();
       this.cargarConceptos();
       this.setupFormWatchers();
+      this.probarAlgoritmo(); // Llamar al método de prueba del servicio
+      this.setupFormWatchers();
+      this.actualizarReloj();
     }
 
     ngOnDestroy(): void {
       this.destroy$.next();
       this.destroy$.complete();
     }
+
+calcularUltimoDiaPago(): string {
+  if (!this.referenciaGenerada?.fechaVencimiento) return '';
+  
+  const [dd, mm, yyyy] = this.referenciaGenerada.fechaVencimiento.split('/');
+  const fechaVencimiento = new Date(parseInt(yyyy), parseInt(mm) - 1, parseInt(dd));
+  fechaVencimiento.setDate(fechaVencimiento.getDate() - 3);
+  
+  return fechaVencimiento.toLocaleDateString('es-MX');
+}
+
+
+
 
   private cargarConceptos(): void {
     this.portalService.obtenerConceptos()
@@ -91,6 +109,22 @@
       });
   }
 
+  // Agregar este método en tu componente
+private probarAlgoritmo(): void {
+  console.log('🧪 === INICIANDO PRUEBA DEL ALGORITMO VBA ===');
+  
+  try {
+    // Llamar al método de prueba del servicio
+    const resultado = this.generadorVBA.pruebaCompleta();
+    
+    console.log('✅ Prueba completada exitosamente');
+    console.log('📊 Resultado:', resultado);
+    
+  } catch (error) {
+    console.error('❌ Error en la prueba:', error);
+  }
+}
+
   private setupFormWatchers(): void {
     this.referenciaForm.get('concepto')?.valueChanges
       .pipe(takeUntil(this.destroy$))
@@ -107,7 +141,7 @@
 
     if (esAsesoria) {
       this.activarSelectorMaterias();
-      this.cargarMateriasPorTipoAsesoria(codigoPago);
+      this.cargarMateriasPorTipoAsesoria();
     } else {
       this.desactivarSelectorMaterias();
     }
@@ -137,80 +171,65 @@
 
 
 
+
+  
+
+
   
 // PASO 1: Primero, limpia tu método cargarMateriasPorTipoAsesoria
-private cargarMateriasPorTipoAsesoria(codigoPago: number): void {
+private cargarMateriasPorTipoAsesoria(): void {
   const formData = this.referenciaForm.value;
-  
-  // Verificar que tenemos los datos mínimos necesarios
-  if (!this.alumnoData) {
-    console.warn('❌ No hay datos del alumno para cargar materias');
+  const semestreId = formData.semestre_id || this.alumnoData?.semestre_id;
+  const carreraId = formData.carrera_id || this.alumnoData?.carrera_id;
+
+  if (!semestreId) {
+    console.warn('⚠️ Falta semestre para cargar materias');
+    this.materias = [];
     return;
   }
 
-  // Para asesorías intersemestrales (código 4)
-  if (codigoPago === 4) {
-    if (!formData.carrera_id || !formData.periodo_id || !formData.semestre_id) {
-      console.warn('❌ Faltan datos para asesorías intersemestrales:', {
-        carrera_id: formData.carrera_id,
-        periodo_id: formData.periodo_id, 
-        semestre_id: formData.semestre_id
-      });
-      return;
-    }
+  const codigoConcepto = parseInt(formData.concepto);
 
-    console.log('🔄 Cargando materias intersemestrales con:', {
-      carrera_id: formData.carrera_id,
-      periodo_id: formData.periodo_id,
-      semestre_id: formData.semestre_id
-    });
-
-    this.portalService.obtenerMateriasFiltradas(
-      formData.carrera_id,
-      formData.periodo_id,
-      formData.semestre_id
-    )
-    .pipe(takeUntil(this.destroy$))
-    .subscribe({
-      next: (response) => {
-        console.log('📝 Respuesta completa API intersemestrales:', response);
-        // AQUÍ ESTÁ EL PROBLEMA - Probablemente la respuesta venga en response.data
-        this.materias = response.materias || response.data || response.results || [];
-        console.log('📚 Materias intersemestrales procesadas:', this.materias);
-      },
-      error: (error) => {
-        console.error('❌ Error al cargar materias intersemestrales:', error);
-        this.materias = [];
-      }
-    });
-  } 
-  // Para asesorías semestrales (código 5)
-  else if (codigoPago === 5) {
-    if (!formData.semestre_id) {
-      console.warn('❌ Falta semestre_id para asesorías semestrales:', formData.semestre_id);
-      return;
-    }
-
-    console.log('🔄 Cargando materias semestrales con semestre_id:', formData.semestre_id);
-
-    this.portalService.obtenerMateriasPorSemestre(formData.semestre_id)
-      .pipe(takeUntil(this.destroy$))
-      .subscribe({
-        next: (response) => {
-          console.log('📝 Respuesta completa API semestrales:', response);
-          // AQUÍ TAMBIÉN - Verificar la estructura de la respuesta
-          this.materias = response.materias || response.data || response.results || [];
-          console.log('📚 Materias semestrales procesadas:', this.materias);
-        },
-        error: (error) => {
-          console.error('❌ Error al cargar materias semestrales:', error);
-          this.materias = [];
-        }
-      });
+  if (codigoConcepto === 5) {
+    // ✅ ASESORÍAS SEMESTRALES (código 5)
+    console.log('🔄 Cargando materias semestrales con semestre_id:', semestreId);
+    this.cargarMateriasConSemestre(semestreId);
+    
+  } else if (codigoConcepto === 4) {
+    // ✅ ASESORÍAS INTERSEMESTRALES (código 4) - USAR MISMO MÉTODO
+    console.log('🔄 Cargando materias intersemestrales con semestre_id:', semestreId);
+    console.log('📅 Nota: Usando mismo endpoint que semestrales');
+    
+    // 🎯 USAR EL MISMO MÉTODO QUE FUNCIONA:
+    this.cargarMateriasConSemestre(semestreId);
   }
 }
 
 
+
+
+
+private cargarMateriasConSemestre(semestreId: number): void {
+  this.portalService.obtenerMateriasPorSemestre(semestreId)
+    .pipe(takeUntil(this.destroy$))
+    .subscribe({
+      next: (response) => {
+        console.log('📝 Respuesta completa API semestrales:', response);
+        
+        if (response && response.data && Array.isArray(response.data)) {
+          this.materias = response.data;
+          console.log('📚 Materias semestrales procesadas:', this.materias);
+        } else {
+          console.warn('⚠️ Respuesta inesperada semestrales:', response);
+          this.materias = [];
+        }
+      },
+      error: (error) => {
+        console.error('❌ Error al cargar materias semestrales:', error);
+        this.materias = [];
+      }
+    });
+}
 
     
 
@@ -321,162 +340,69 @@ private cargarMateriasPorTipoAsesoria(codigoPago: number): void {
           }
         });
     }
-/**
- * 
- 
-  private configurarWatchers(): void {
-  // Watch matrícula
-  this.referenciaForm.get('matricula')?.valueChanges
+    
+  buscarAlumno(): void {
+  const matricula = this.referenciaForm.get('matricula')?.value;
+  
+  if (!matricula || matricula.length < 8) {
+    return;
+  }
+
+  console.log('🔍 Buscando alumno con matrícula:', matricula);
+  
+  this.portalService.obtenerAlumnoPorMatricula(matricula)
     .pipe(takeUntil(this.destroy$))
-    .subscribe((matricula: string) => {
-      console.log('👤 Matrícula cambiada:', matricula);
-      if (matricula && matricula.length >= 10) {
-        this.buscarAlumno(matricula);
-      } else {
+    .subscribe({
+      next: (alumno) => {
+        this.alumnoData = alumno;
+        console.log('✅ Alumno encontrado:', this.alumnoData);
+        
+        // Pre-llenar campos si tiene datos
+        if (this.alumnoData?.carrera_id) {
+          this.referenciaForm.patchValue({
+            carrera_id: this.alumnoData.carrera_id
+          });
+        }
+        
+        if (this.alumnoData?.semestre_id) {
+          this.referenciaForm.patchValue({
+            semestre_id: this.alumnoData.semestre_id
+          });
+        }
+      },
+      error: (error) => {
+        console.error('❌ Error al buscar alumno:', error);
         this.alumnoData = null;
-        this.limpiarSelecciones();
+        this.mostrarError('Alumno no encontrado con esa matrícula');
       }
     });
+}
 
-    
-/**      // Watch concepto
-      this.referenciaForm.get('concepto')?.valueChanges
-        .pipe(takeUntil(this.destroy$))
-        .subscribe((concepto: string) => {
-          console.log('📋 Concepto cambiado:', concepto);
-          this.mostrarMaterias = concepto === 'ASESORIA_SEMESTRALES';
-          if (this.mostrarMaterias) {
-            this.configurarValidacionesMaterias();
-          } else {
-            this.removerValidacionesMaterias();
-          }
-          this.materias = []; // ✅ Asegurar que sea array vacío
-        });
+onConceptoChange(): void {
+  const concepto = this.referenciaForm.get('concepto')?.value;
+  const codigoConcepto = parseInt(concepto);
+  
+  console.log('🎯 Concepto seleccionado:', codigoConcepto);
+  
+  this.mostrarMaterias = (codigoConcepto === 4 || codigoConcepto === 5);
+  
+  if (this.mostrarMaterias) {
+    // ✅ AGREGAR ESTA LÍNEA QUE FALTA:
+    this.cargarMateriasPorTipoAsesoria();
+  } else {
+    // ✅ LIMPIAR MATERIAS SI NO ES ASESORÍA:
+    this.materias = [];
+    this.referenciaForm.patchValue({
+      materia_id: null
+    });
+  }
+}
 
-*/
 
-      
-/**
-      // Watch filtros para materias
-      this.referenciaForm.get('periodo_id')?.valueChanges
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(() => {
-          console.log('📅 Período cambiado, filtrando materias...');
-          this.obtenerMateriasFiltradas();
-        });
 
-      this.referenciaForm.get('semestre_id')?.valueChanges
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(() => {
-          console.log('📚 Semestre cambiado, filtrando materias...');
-          this.obtenerMateriasFiltradas();
-        });
 
-      this.referenciaForm.get('carrera_id')?.valueChanges
-        .pipe(takeUntil(this.destroy$))
-        .subscribe(() => {
-          console.log('🎓 Carrera cambiada, filtrando materias...');
-          this.obtenerMateriasFiltradas();
-        });
-    }
 
-    private buscarAlumno(matricula: string): void {
-      console.log('🔍 Buscando alumno con matrícula:', matricula);
-      this.isLoading = true;
-      
-      this.portalService.obtenerAlumnoPorMatricula(matricula)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (response: any) => {
-            console.log('✅ Respuesta alumno completa:', response);
-            
-            // ✅ MANEJAR RESPUESTA DEL ALUMNO
-            if (response && response.alumno) {
-              this.alumnoData = response.alumno;
-            } else if (response && response.id) {
-              this.alumnoData = response;
-            } else {
-              console.warn('⚠️ Formato de respuesta de alumno inesperado:', response);
-              this.alumnoData = null;
-            }
-            
-            // Auto-llenar carrera y semestre del alumno
-            if (this.alumnoData) {
-              this.referenciaForm.patchValue({
-                carrera_id: this.alumnoData.carrera_id,
-                semestre_id: this.alumnoData.semestre_id
-              });
-            }
-            this.isLoading = false;
-          },
-          error: (error: any) => {
-            console.error('❌ Error al buscar alumno:', error);
-            this.alumnoData = null;
-            this.isLoading = false;
-            this.mostrarError('Alumno no encontrado con esa matrícula');
-          }
-        });
-    }
 
-  /**
-  private obtenerMateriasFiltradas(): void {
-      if (!this.mostrarSelectorMaterias) return;
-
-      const carrera_id = this.referenciaForm.get('carrera_id')?.value;
-      const periodo_id = this.referenciaForm.get('periodo_id')?.value;
-      const semestre_id = this.referenciaForm.get('semestre_id')?.value;
-
-      console.log('🔍 Filtrando materias con:', { carrera_id, periodo_id, semestre_id });
-
-      if (carrera_id && periodo_id && semestre_id) {
-        this.portalService.obtenerMateriasFiltradas(carrera_id, periodo_id, semestre_id)
-          .pipe(takeUntil(this.destroy$))
-          .subscribe({
-            next: (response: any) => {
-              console.log('✅ Respuesta materias completa:', response);
-              
-              // ✅ ASEGURAR QUE MATERIAS SEA UN ARRAY
-              if (response && response.data && Array.isArray(response.data)) {
-                this.materias = response.data;
-              } else if (response && Array.isArray(response)) {
-                this.materias = response;
-              } else {
-                console.warn('⚠️ Materias no es un array:', response);
-                this.materias = [];
-              }
-              
-              console.log('📊 Materias procesadas:', this.materias);
-            },
-            error: (error: any) => {
-              console.error('❌ Error al filtrar materias:', error);
-              this.materias = [];
-            }
-          });
-      } else {
-        this.materias = [];
-      }
-    }
-
-  /*private filtrarMaterias(): void {
-    if (!this.mostrarMaterias) return;
-    
-    const semestre_id = this.referenciaForm.get('semestre_id')?.value;
-    
-    if (semestre_id) {
-      this.portalService.obtenerMateriasPorSemestre(semestre_id)
-        .pipe(takeUntil(this.destroy$))
-        .subscribe({
-          next: (response: any) => {
-            this.materias = this.ensureArray(response);
-            console.log('📊 Materias cargadas:', this.materias);
-          },
-          error: (error: any) => {
-            console.error('❌ Error:', error);
-            this.materias = [];
-          }
-        });
-    }
-  }*/
 
     private configurarValidacionesMaterias(): void {
       this.referenciaForm.get('periodo_id')?.setValidators([Validators.required]);
@@ -525,134 +451,160 @@ private cargarMateriasPorTipoAsesoria(codigoPago: number): void {
     }
 
     // Método principal para generar referencia
-    generarReferencia(): void {
-      console.log('🎫 Generando referencia...');
-      console.log('📝 Estado del formulario:', this.referenciaForm.value);
-      console.log('✅ Formulario válido:', this.referenciaForm.valid);
+generarReferencia(): void {
+  console.log('🎫 Generando referencia con algoritmo VBA...');
 
-      if (this.referenciaForm.invalid) {
-        this.marcarCamposComoTocados();
-        this.mostrarError('Por favor completa todos los campos requeridos');
-        return;
-      }
-
-      if (!this.alumnoData) {
-        this.mostrarError('Primero debes ingresar una matrícula válida');
-        return;
-      }
-
-    this.isLoading = true;
-    const formData = this.referenciaForm.value;
-    const codigoPagoSeleccionado = parseInt(formData.concepto);
-
-  // Construir concepto para la referencia
-    let conceptoFinal = codigoPagoSeleccionado.toString();
-    let descripcionCompleta = '';
-    let importeFinal = 0;
-
-  // Buscar el concepto seleccionado en los datos de la BD
-    const conceptoSeleccionado = this.conceptos.find(c => c.codigo_pago === codigoPagoSeleccionado);
-
-    if (conceptoSeleccionado) {
-      descripcionCompleta = conceptoSeleccionado.nombre;
-      importeFinal = conceptoSeleccionado.importe;
-      
-      // Manejo especial para asesorías (códigos 4 y 5)
-      if ((codigoPagoSeleccionado === 4 || codigoPagoSeleccionado === 5) && formData.materia_id) {
-        const materia = this.materias.find(m => m.id == formData.materia_id);
-        if (materia) {
-          conceptoFinal = `${codigoPagoSeleccionado}_${materia.siglas}`;
-          descripcionCompleta = `${conceptoSeleccionado.nombre} - ${materia.nombre}`;
-        }
-      }
-    } else {
-      console.warn('Concepto no encontrado:', codigoPagoSeleccionado);
-      this.mostrarError('Concepto no válido seleccionado');
-      this.isLoading = false;
-      return;
-    }
-
-      // Datos para generar referencia
-    const referenciaData = {
-      concepto: conceptoFinal,
-      fechaVencimiento: this.calcularFechaVencimiento(),
-      importe: importeFinal, // Ahora viene directo de la BD
-      variable: this.generarVariable(formData, codigoPagoSeleccionado),
-      alumnoId: this.alumnoData.id,
-      matricula: formData.matricula
-    };
-
-      console.log('📊 Datos para generar referencia:', referenciaData);
-
-      try {
-        // Generar referencia usando el servicio existente
-        this.referenciaGenerada = this.referenceService.generarReferencia(referenciaData);
-        
-        // Agregar descripción completa
-        if (this.referenciaGenerada) {
-          this.referenciaGenerada.descripcion = descripcionCompleta;
-        }
-
-        console.log('✅ Referencia generada:', this.referenciaGenerada);
-
-        // Guardar en BD con información adicional
-  if (this.alumnoData?.id) {
-        const datosCompletos = {
-          ...this.referenciaGenerada,
-          carrera_id: formData.carrera_id || this.alumnoData.carrera_id,
-          periodo_id: formData.periodo_id,
-          semestre_id: formData.semestre_id || this.alumnoData.semestre_id,
-          materia_id: formData.materia_id || null,
-          descripcion: descripcionCompleta,
-          codigo_pago: codigoPagoSeleccionado
-        };
-
-        this.referenceService.guardarReferencia(datosCompletos, this.alumnoData.id)
-          .pipe(takeUntil(this.destroy$))
-          .subscribe({
-            next: (response: any) => {
-              console.log('✅ Referencia guardada:', response);
-              this.mostrarExito('¡Referencia generada y guardada exitosamente!');
-              this.isLoading = false;
-            },
-            error: (error: any) => {
-              console.error('❌ Error al guardar referencia:', error);
-              this.mostrarError('Referencia generada pero hubo un error al guardar en la base de datos');
-              this.isLoading = false;
-            }
-          });
-      } else {
-        this.mostrarExito('¡Referencia generada exitosamente!');
-        this.isLoading = false;
-      }
-
-    } catch (error) {
-      console.error('❌ Error al generar referencia:', error);
-      this.mostrarError('Error al generar la referencia. Verifica los datos e intenta nuevamente.');
-      this.isLoading = false;
-    }
+  if (this.referenciaForm.invalid) {
+    this.marcarCamposComoTocados();
+    this.mostrarError('Por favor completa todos los campos requeridos');
+    return;
   }
 
+  if (!this.alumnoData) {
+    this.mostrarError('Primero debes ingresar una matrícula válida');
+    return;
+  }
 
+  this.isLoading = true;
+  const formData = this.referenciaForm.value;
+  const codigoPagoSeleccionado = parseInt(formData.concepto);
 
-    private calcularFechaVencimiento(): string {
-      const fecha = new Date();
-      fecha.setDate(fecha.getDate() + 30);
-      return fecha.toISOString().split('T')[0];
+  const conceptoSeleccionado = this.conceptos.find(c => c.codigo_pago === codigoPagoSeleccionado);
+
+  if (!conceptoSeleccionado) {
+    this.mostrarError('Concepto no válido seleccionado');
+    this.isLoading = false;
+    return;
+  }
+
+  try {
+    // 🎯 DETECTAR SI ES CONCEPTO DE ASESORÍA
+    const esAsesoria = (codigoPagoSeleccionado === 4 || codigoPagoSeleccionado === 5);
+    
+    // 🎯 PREPARAR DATOS PARA ALGORITMO VBA
+    const datosVBA: DatosReferenciaVBA = {
+      concepto: codigoPagoSeleccionado.toString().padStart(2, '0'),
+      fecha: this.calcularFechaVencimiento(),
+      importe: conceptoSeleccionado.importe,
+      variable: '0',
+      matricula: this.alumnoData.matricula
+    };
+
+    // ✅ AGREGAR SIGLAS DE MATERIA O PERÍODO SEGÚN CORRESPONDA
+    if (esAsesoria && formData.materia_id) {
+      // 📚 Para asesorías: buscar siglas de la materia seleccionada
+      const materiaSeleccionada = this.materias.find(m => m.id == formData.materia_id);
+      if (materiaSeleccionada && materiaSeleccionada.siglas) {
+        datosVBA.siglas_materia = materiaSeleccionada.siglas;
+        console.log('📚 Usando siglas de materia:', materiaSeleccionada.siglas);
+      } else {
+        this.mostrarError('Debe seleccionar una materia válida para asesorías');
+        this.isLoading = false;
+        return;
+      }
+    } else if (esAsesoria && !formData.materia_id) {
+      this.mostrarError('Debe seleccionar una materia para conceptos de asesoría');
+      this.isLoading = false;
+      return;
+    } else {
+      // 📅 Para conceptos normales: usar período automático
+      datosVBA.periodo = this.calcularPeriodoAutomatico();
+      console.log('📅 Usando período automático:', datosVBA.periodo);
     }
 
-  /**
-    private calcularImporte(concepto: string): number {
-      const importes: { [key: string]: number } = {
-        'REINGRESO': 500.00,
-        'REINSCRIPCION': 300.00,
-        'CREDENCIAL': 150.00,
-        'ASESORIA_COMPLEMENTARIA': 250.00
-      };
-      return importes[concepto] || 100.00;
-    }
-    */
+    console.log('📊 Datos finales para algoritmo VBA:', datosVBA);
 
+    // 🚀 GENERAR CON ALGORITMO VBA
+    const referenciaVBA = this.generadorVBA.generarReferencia(datosVBA);
+    
+    // 📋 CONSTRUIR REFERENCIA COMPLETA
+    this.referenciaGenerada = {
+      referenciaCompleta: referenciaVBA.referenciaCompleta,
+      referenciaBase: referenciaVBA.referenciaBase,
+      digitoVerificador: referenciaVBA.digitoVerificador,
+      fechaCondensada: referenciaVBA.fechaCondensada,
+      importeCondensado: referenciaVBA.importeCondensado,
+      
+      referencia: referenciaVBA.referenciaCompleta,
+      concepto: codigoPagoSeleccionado.toString(),
+      descripcion: conceptoSeleccionado.nombre,
+      fechaVencimiento: this.calcularFechaVencimiento(),
+      importe: conceptoSeleccionado.importe,
+      fechaGeneracion: new Date().toISOString().split('T')[0],
+      diasVigentes: 18,
+      estado: 'Vigente',
+      
+      alumno_id: this.alumnoData.id,
+      concepto_id: conceptoSeleccionado.id,
+      codigo_pago: codigoPagoSeleccionado
+    };
+
+    console.log('✅ Referencia generada:', this.referenciaGenerada);
+    this.guardarReferenciaEnBD();
+
+  } catch (error) {
+    console.error('❌ Error:', error);
+    this.mostrarError('Error al generar la referencia');
+    this.isLoading = false;
+  }
+}
+
+
+private calcularPeriodoAutomatico(): string {
+  const hoy = new Date();
+  const mes = hoy.getMonth() + 1; // 1-12
+  const año = hoy.getFullYear();
+  
+  if (mes >= 2 && mes <= 7) {
+    return `FEBJUL${año.toString().slice(-2)}`;
+  } else {
+    return `AGODIC${año.toString().slice(-2)}`;
+  }
+}
+
+
+
+private calcularFechaVencimiento(): string {
+  const fecha = new Date();
+  fecha.setDate(fecha.getDate() + 18); // ✅ 18 días = 15 días efectivos
+  
+  const dd = fecha.getDate().toString().padStart(2, '0');
+  const mm = (fecha.getMonth() + 1).toString().padStart(2, '0');
+  const yyyy = fecha.getFullYear();
+  
+  return `${dd}/${mm}/${yyyy}`;
+}
+
+private guardarReferenciaEnBD(): void {
+    if (!this.alumnoData?.id || !this.referenciaGenerada) return;
+
+    const formData = this.referenciaForm.value;
+    
+    const datosCompletos: ReferenciaCompleta = {
+      ...this.referenciaGenerada,
+      referencia: this.referenciaGenerada.referenciaCompleta, // ✅ Compatibilidad
+      carrera_id: formData.carrera_id || this.alumnoData.carrera_id,
+      periodo_id: formData.periodo_id,
+      semestre_id: formData.semestre_id || this.alumnoData.semestre_id,
+      materia_id: formData.materia_id || null
+    };
+
+    // ✅ USAR el nuevo servicio:
+    this.generadorVBA.guardarReferencia(datosCompletos, this.alumnoData.id)
+      .pipe(takeUntil(this.destroy$))
+      .subscribe({
+        next: (response: any) => {
+          console.log('✅ Referencia guardada:', response);
+          this.mostrarExito('¡Referencia generada y guardada exitosamente!');
+          this.isLoading = false;
+        },
+        error: (error: any) => {
+          console.error('❌ Error al guardar referencia:', error);
+          this.mostrarError('Referencia generada pero hubo un error al guardar');
+          this.isLoading = false;
+        }
+      });
+  }
 
     private generarVariable(formData: any, codigoPago: number): string {
       // Para asesorías (códigos 4 y 5)

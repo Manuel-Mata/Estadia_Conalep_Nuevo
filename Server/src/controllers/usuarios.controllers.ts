@@ -1,16 +1,19 @@
+// src/controllers/usuarios.controllers.ts
 import { Request, Response } from "express";
 import connection from "../db/connection";
 import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
+import { RowDataPacket } from 'mysql2';
 
-export const getUsuarios = (req: Request, res: Response) => {
-    connection.query('SELECT * FROM Usuarios', (err, results) => {
+export const getUsuarios = (req: Request, res: Response): void => {
+    connection.query('SELECT * FROM Usuarios', (err: any, results: RowDataPacket[]) => {
         if (err) {
             console.error('Error al obtener usuarios', err);
-            return res.status(500).json({
+            res.status(500).json({
                 msg: 'Error en la base de datos',
                 error: err
             });
+            return;
         }
         res.json({
             msg: 'Usuarios obtenidos exitosamente',
@@ -19,27 +22,25 @@ export const getUsuarios = (req: Request, res: Response) => {
     });
 };
 
-// ✅ AGREGAR ESTE MÉTODO LOGIN
-export const login = async (req: Request, res: Response) => {
+// ✅ Tipo de retorno corregido: Promise<void>
+export const login = async (req: Request, res: Response): Promise<void> => {
     try {
         const { correo, contrasena, tipo_usuario, matricula } = req.body;
 
         console.log('🔍 Login intento:', { correo, tipo_usuario, matricula });
 
-        // Validar datos requeridos
         if (!correo || !contrasena || !tipo_usuario) {
-            return res.status(400).json({
+            res.status(400).json({
                 success: false,
                 message: 'Correo, contraseña y tipo de usuario son requeridos'
             });
+            return;
         }
 
-        // Consulta SQL ajustada a tu estructura real
         let query: string;
         let queryParams: any[];
 
         if (tipo_usuario === 'alumno') {
-            // ✅ Solo seleccionar columnas que SÍ existen
             query = `
                 SELECT u.*, a.matricula as alumno_matricula, a.correo_institucional 
                 FROM Usuarios u 
@@ -48,36 +49,32 @@ export const login = async (req: Request, res: Response) => {
             `;
             queryParams = [correo.toLowerCase(), tipo_usuario, matricula];
         } else {
+            // ✅ Corregido: quitar el alias 'u.'
             query = `SELECT * FROM Usuarios WHERE correo = ? AND tipo_usuario = ?`;
             queryParams = [correo.toLowerCase(), tipo_usuario];
         }
 
-        console.log('📋 Query SQL:', query);
-        console.log('📋 Parámetros:', queryParams);
-
-        // Ejecutar consulta
-        connection.query(query, queryParams, async (err, results: any[]) => {
+        connection.query(query, queryParams, async (err: any, results: RowDataPacket[]) => {
             if (err) {
                 console.error('❌ Error BD:', err);
-                return res.status(500).json({
+                res.status(500).json({
                     success: false,
                     message: 'Error en la base de datos'
                 });
+                return;
             }
 
-            console.log('📊 Resultados BD:', results);
-
             if (!results || results.length === 0) {
-                return res.status(401).json({
+                res.status(401).json({
                     success: false,
                     message: 'Credenciales incorrectas - Usuario no encontrado'
                 });
+                return;
             }
 
             const usuario = results[0];
 
             try {
-                // Verificar contraseña
                 let isPasswordValid = false;
                 
                 if (usuario.contrasena && usuario.contrasena.startsWith('$2b$')) {
@@ -86,16 +83,14 @@ export const login = async (req: Request, res: Response) => {
                     isPasswordValid = contrasena === usuario.contrasena;
                 }
                 
-                console.log('🔐 Verificación contraseña:', isPasswordValid);
-                
                 if (!isPasswordValid) {
-                    return res.status(401).json({
+                    res.status(401).json({
                         success: false,
                         message: 'Credenciales incorrectas - Contraseña inválida'
                     });
+                    return;
                 }
 
-                // Generar token JWT
                 const token = jwt.sign(
                     { 
                         userId: usuario.id,
@@ -107,7 +102,6 @@ export const login = async (req: Request, res: Response) => {
                     { expiresIn: '24h' }
                 );
 
-                // ✅ Respuesta exitosa - sin campos que no existen
                 res.json({
                     success: true,
                     message: 'Login exitoso',
@@ -122,11 +116,9 @@ export const login = async (req: Request, res: Response) => {
                     }
                 });
 
-                console.log('✅ Login exitoso para:', usuario.correo);
-
             } catch (passwordError) {
                 console.error('❌ Error verificando contraseña:', passwordError);
-                return res.status(500).json({
+                res.status(500).json({
                     success: false,
                     message: 'Error verificando credenciales'
                 });
